@@ -1,0 +1,21 @@
+/* _preview.html 전용 (색 견본). 실제 페이지에서는 쓰지 않는다 */
+.swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.swatch { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.swatch__color { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); flex: none; }
+.swatch--bg { background: var(--bg); }
+.swatch--card { background: var(--card); }
+.swatch--surface { background: var(--surface); }
+.swatch--text { background: var(--text); }
+.swatch--text-muted { background: var(--text-muted); }
+.swatch--accent { background: var(--accent); }
+.swatch--accent-strong { background: var(--accent-strong); }
+.swatch--danger { background: var(--danger); }
+.card .topbar { position: static; padding: 0; }
+.preview-stack p { margin: 0; }
+.preview-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.preview-stack > * + * { margin-top: 10px; }
+.preview-note { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
+.font-sample { font-size: 20px; }
+.font-sample--400 { font-weight: 400; }
+.font-sample--700 { font-weight: 700; }
+.font-sample--800 { font-weight: 800; }

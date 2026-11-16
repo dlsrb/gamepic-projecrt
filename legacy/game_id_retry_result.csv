@@ -1,0 +1,35 @@
+﻿game_id,name,android_id,android_title,android_developer,installs,score,ratings,match_score,note
+dq8,드래곤 퀘스트 VIII,com.square_enix.android_googleplay.dq8,DRAGON QUEST VIII,"SQUARE ENIX Co.,Ltd.","100,000+",3.61,9594,1.0,후보 목록에서 채택 (com.square_enix.android_googleplay.dq8)
+ff6,파이널 판타지 VI 픽셀 리마스터,com.square_enix.android_googleplay.FFVII,FINAL FANTASY VII,"SQUARE ENIX Co.,Ltd.","500,000+",3.52,14304,0.966,search(name_en)으로 채택
+chrono,크로노 트리거,,,,0,0.0,0,0.5,"유사도 미달 (<0.6): Lost Realm: Chronorift(com.droidhen.game.lostrealm, 점수:0.50), 크로노스 트라이얼 RPG(com.vistayegames.chronostrials, 점수:0.47), RPG Chronus Arc(kemco.hitpoint.chronus, 점수:0.46)"
+maplem,메이플스토리M,com.nexon.maplem.global,MapleStory M - Fantasy MMORPG,NEXON Company,"5,000,000+",3.52,127660,1.0,후보 목록에서 채택 (com.nexon.maplem.global)
+summoners,서머너즈 워,com.com2us.smon.normal.freefull.google.kr.android.common,서머너즈 워: 천공의 아레나,Com2uS,"50,000,000+",4.1,2324322,1.0,후보 목록에서 채택 (com.com2us.smon.normal.freefull.google.kr.android.common)
+7kidle,세븐나이츠 키우기,com.netmarble.skiagb,세븐나이츠 키우기,Netmarble,"1,000,000+",4.36,174737,1.0,후보 목록에서 채택 (com.netmarble.skiagb)
+mushroom,버섯커 키우기,com.mxdzzkr.google,버섯커 키우기-3000뽑기 증정,Joy Nice Games,"1,000,000+",4.71,115437,1.0,search(name_en)으로 채택
+darkest,다키스트 던전,com.funstudio.dungeonheroes,Dungeon: Age of Heroes,AM Mobile Games,"1,000,000+",4.5,26174,0.9,search(name_en)으로 채택
+brotato,브로타토,com.brotato.shooting.survivors.action.roguelike,Brotato,Erabit Studios,"10,000,000+",4.71,141489,1.0,후보 목록에서 채택 (com.brotato.shooting.survivors.action.roguelike)
+grimvalor,그림발러,com.direlight.grimvalor,Grimvalor,Direlight,"5,000,000+",4.79,132928,1.0,후보 목록에서 채택 (com.direlight.grimvalor)
+shadowgun,섀도우건 레전드,com.madfingergames.legends,섀도우건 레전드 ( Shadowgun Legends),Deca_Games,"10,000,000+",4.32,370262,1.0,후보 목록에서 채택 (com.madfingergames.legends)
+intothedead2,인투 더 데드 2,com.pikpok.dr2.play,인투더데드2 [Into the Dead 2],PIKPOK,"10,000,000+",4.42,720114,0.9,후보 목록에서 채택 (com.pikpok.dr2.play)
+phoenix2,피닉스 2,,,,0,0.0,0,0.583,"유사도 미달 (<0.6): Phoenix Evolution: Idle Merge(br.com.tapps.phoenixevolution, 점수:0.58), Epic Conquest 2(com.GacoGames.EC2, 점수:0.38), LINE POP2(com.linecorp.LGLP2, 점수:0.38)"
+battlecats,냥코 대전쟁,jp.co.ponos.battlecatskr,냥코 대전쟁,PONOS Corporation,"10,000,000+",4.11,200223,1.0,후보 목록에서 채택 (jp.co.ponos.battlecatskr)
+kingdomrush,킹덤 러시,com.ironhidegames.android.kingdomrush,Kingdom Rush 킹덤 러쉬 전략형 타워 디펜스,Ironhide Games,"10,000,000+",4.86,853904,0.9,후보 목록에서 채택 (com.ironhidegames.android.kingdomrush)
+anipang4,애니팡4,com.sundaytoz.mobile.anipang.google.service,애니팡,"Wemade Play Co.,Ltd.","10,000,000+",3.84,184331,0.9,search(name_en)으로 채택
+blockblast,블록 블라스트,com.block.juggle,블록 블라스트 (Block Blast),HungryStudio,"1,000,000,000+",4.77,5801172,1.0,후보 목록에서 채택 (com.block.juggle)
+toonblast,툰 블라스트,net.peakgames.toonblast,Toon Blast,Peak,"100,000,000+",4.62,4676552,1.0,후보 목록에서 채택 (net.peakgames.toonblast)
+twodots,투 닷,com.weplaydots.twodotsandroid,Two Dots,PlayDots,"50,000,000+",4.58,1160835,1.0,후보 목록에서 채택 (com.weplaydots.twodotsandroid)
+minimetro,미니 메트로,nz.co.codepoint.minimetro,미니 메트로,Dinosaur Polo Club,"1,000,000+",4.71,74740,1.0,후보 목록에서 채택 (nz.co.codepoint.minimetro)
+alto,알토의 오디세이,com.noodlecake.altosodyssey,Alto's Odyssey,Noodlecake,"10,000,000+",4.57,287240,1.0,후보 목록에서 채택 (com.noodlecake.altosodyssey)
+catsoup,고양이 스낵바,com.hidea.cat,고양이와 스프: 귀여운 힐링 방치형 키우기 게임,NEOWIZ,"10,000,000+",4.65,1765065,0.667,후보 목록에서 채택 (com.hidea.cat)
+penguinisle,펭귄의 섬,air.com.qublix.penguincubes,Penguin Pals: Arctic Rescue,Qublix Games,"500,000+",4.53,21398,0.727,search(name_en)으로 채택
+gamedevstory,게임 개발 스토리,net.kairosoft.android.gamedev3en,게임개발 스토리,Kairosoft,"1,000,000+",4.93,82403,1.0,후보 목록에서 채택 (net.kairosoft.android.gamedev3en)
+acpc,동물의 숲 포켓캠프 컴플리트,,,,0,0.0,0,0.545,"유사도 미달 (<0.6): 동물캠프 : 리조트 이야기(com.poomgames.animalcamplite, 점수:0.55), Animal Jam(동물 잼)(com.WildWorks.AnimalJamPlayWild, 점수:0.52), 포켓 챔프: 3D 레이싱 게임(com.pocketchamps.game, 점수:0.38)"
+gris,GRIS,,,,0,0.0,0,0.375,"유사도 미달 (<0.6): 꿈의 정원 (Gardenscapes)(com.playrix.gardenscapes, 점수:0.38), Terraria(com.and.games505.TerrariaPaid, 점수:0.33), 헝그리 샤크 월드 (Hungry Shark World)(com.ubisoft.hungrysharkworld, 점수:0.30)"
+lis,라이프 이즈 스트레인지,com.squareenix.lis,Life is Strange,SQUARE ENIX LTD,"5,000,000+",3.94,115238,1.0,후보 목록에서 채택 (com.squareenix.lis)
+machinarium,머시나리움,com.littlefieldstudio.MachinikaMuseum,Machinika: Museum,Dear Villagers,"500,000+",4.4,11347,0.7,search(name_en)으로 채택
+florence,플로렌스,com.mountains.feathertop,Florence,Annapurna Interactive,"100,000+",4.6,15436,1.0,search(name_en)으로 채택
+fcm,EA SPORTS FC 모바일,com.nexon.fmk,FC 모바일,NEXON Company,"5,000,000+",2.72,150879,0.9,search(name_en)으로 채택
+8ball,8 Ball Pool,com.fc.pool.live.billiards,8 ball pool - 8 볼 클래시,CYLINDER GLOBAL PTE. LTD.,"10,000,000+",0.0,0,1.0,search(name_en)으로 채택
+newstarsoccer,뉴 스타 사커,uk.fiveaces.freestory,New Star™ Soccer G-Story Ch1-3,New Star Publishing Ltd.,"100,000+",0.0,0,0.963,search(name_en)으로 채택
+pjsekai,프로젝트 세카이,com.pjsekai.kr,프로젝트 세카이 컬러풀 스테이지! feat.하츠네 미쿠,Nuverse,"1,000,000+",4.33,26252,0.9,search(name_en)으로 채택
+pianotiles2,피아노 타일 2,beats.color.sing.star.rush,피아노타일9: 리듬게임 음악·노래·음악·케이팝,Beatwave Studio,"10,000,000+",4.69,109979,0.833,search(name_en)으로 채택

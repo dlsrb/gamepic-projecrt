@@ -1,0 +1,15 @@
+.env
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/raw/
+# 스토어 아이콘 (상표·저작권) — python scripts/fetch_game_meta.py 로 내려받음
+static/img/games/
+# 스토어 자동 수집 로그 (scripts/sync_store.py)
+logs/
+# Replit에 올릴 묶음 (python scripts/pack_for_replit.py)
+dist/
+.idea/
+__pycache__/
+.venv/

@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "id": "q1", "text": "주로 사용하는 기기/플랫폼은?", "required": true, "min": 1, "max": 1,
+      "options": [
+        {"label": "Android", "value": "android", "engine": {"platform": "android"}},
+        {"label": "iOS", "value": "ios", "engine": {"platform": "ios"}},
+        {"label": "둘 다", "value": "both", "engine": {"platform": "both"}}
+      ]
+    },
+    {
+      "id": "q2", "text": "무료/유료 게임을 선택해 주세요", "required": true, "min": 1, "max": 1,
+      "options": [
+        {"label": "무료만", "value": "free_only", "engine": {"dislikes": ["bm:유료구매"]}},
+        {"label": "유료도 괜찮아요", "value": "paid_ok"},
+        {"label": "상관없어요", "value": "any"}
+      ]
+    },
+    {
+      "id": "q2_1", "text": "어느 정도 비용까지 괜찮나요?", "required": false, "min": 0, "max": 1,
+      "show_if": {"q2": ["paid_ok"]},
+      "options": [
+        {"label": "~5천원", "value": "5000", "engine": {"max_price": 5000}},
+        {"label": "~1만원", "value": "10000", "engine": {"max_price": 10000}},
+        {"label": "~3만원", "value": "30000", "engine": {"max_price": 30000}},
+        {"label": "상관없어요", "value": "any"}
+      ]
+    },
+    {
+      "id": "q3", "text": "선호하는 키워드를 골라 주세요", "hint": "2개 이상", "required": true, "min": 2,
+      "options": {"from": "tags", "categories": ["genre", "subgenre"], "as": "like"}
+    },
+    {
+      "id": "q4", "text": "싫어하거나 피하고 싶은 것을 골라 주세요", "hint": "고른 것이 들어간 게임은 추천하지 않아요",
+      "required": true, "min": 1,
+      "options": {"from": "tags", "categories": ["genre", "subgenre", "play", "mood"], "as": "dislike"},
+      "extra_options": [{"label": "딱히 없어요", "value": "none", "exclusive": true}]
+    },
+    {
+      "id": "q5", "text": "최근에 재밌게 한 게임을 골라 주세요", "hint": "최대 3개", "required": true, "min": 0, "max": 3,
+      "options": {"from": "games"},
+      "extra_options": [{"label": "없어요", "value": "none", "exclusive": true}]
+    },
+    {
+      "id": "q6", "text": "과금 모델 선호도는?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "광고 싫어요", "value": "no_ads", "engine": {"dislikes": ["bm:광고"]}},
+        {"label": "가챠 싫어요", "value": "no_gacha", "engine": {"dislikes": ["bm:가챠"]}},
+        {"label": "둘 다 싫어요", "value": "no_both", "engine": {"dislikes": ["bm:광고", "bm:가챠"]}},
+        {"label": "무과금도 할 만했으면", "value": "f2p_ok", "engine": {"likes.bm": ["무과금가능"]}},
+        {"label": "상관없어요", "value": "any"}
+      ]
+    },
+    {
+      "id": "q7", "text": "선호하는 아트/그래픽 스타일은?", "required": false, "min": 0,
+      "options": {"from": "tags", "categories": ["view"], "as": "like"}
+    },
+    {
+      "id": "q8", "text": "하루 평균 플레이 시간은?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "짧게 (30분 미만)", "value": "short", "engine": {"likes.play": ["짧은플레이"]}},
+        {"label": "보통", "value": "normal"},
+        {"label": "길게 (2시간 이상)", "value": "long"}
+      ]
+    },
+    {
+      "id": "q9", "text": "어떤 재미/플레이 스타일을 원하나요?", "required": false, "min": 0,
+      "options": [
+        {"label": "성장", "value": "growth"},
+        {"label": "경쟁", "value": "compete", "engine": {"likes.play": ["PvP"]}},
+        {"label": "탐험", "value": "explore", "engine": {"likes.play": ["오픈월드"]}},
+        {"label": "수집", "value": "collect", "engine": {"subgenres": ["수집형RPG"]}},
+        {"label": "힐링", "value": "healing", "engine": {"likes.mood": ["힐링"]}},
+        {"label": "두뇌", "value": "brain", "engine": {"boost": ["genre:퍼즐"]}}
+      ]
+    },
+    {
+      "id": "q10", "text": "AI를 활용한 게임도 괜찮나요?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "괜찮아요", "value": "ok", "engine": {"ai_ok": true}},
+        {"label": "피하고 싶어요", "value": "avoid", "engine": {"ai_ok": false}}
+      ]
+    },
+    {
+      "id": "q11", "text": "어떤 난이도를 원하나요?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "쉬움", "value": "easy", "engine": {"difficulty": "easy"}},
+        {"label": "보통", "value": "normal", "engine": {"difficulty": "normal"}},
+        {"label": "어려움", "value": "hard", "engine": {"difficulty": "hard"}}
+      ]
+    },
+    {
+      "id": "q12", "text": "주로 어떻게 플레이하고 싶나요?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "혼자", "value": "solo", "engine": {"likes.play": ["싱글"]}},
+        {"label": "친구·다른 사람과", "value": "together", "engine": {"likes.play": ["멀티"]}},
+        {"label": "상관없어요", "value": "any"}
+      ]
+    },
+    {
+      "id": "q13", "text": "원하는 분위기·스토리 컨셉은?", "required": false, "min": 0,
+      "options": {"from": "tags", "categories": ["mood"], "as": "like"}
+    },
+    {
+      "id": "q14", "text": "오프라인 게임을 원하나요?", "required": false, "min": 0, "max": 1,
+      "options": [
+        {"label": "꼭 오프라인", "value": "must", "engine": {"require": ["play:오프라인"]}},
+        {"label": "있으면 좋아요", "value": "nice", "engine": {"likes.play": ["오프라인"]}},
+        {"label": "상관없어요", "value": "any"}
+      ]
+    }
+  ]
+}

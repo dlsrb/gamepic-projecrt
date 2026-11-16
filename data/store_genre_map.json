@@ -1,0 +1,42 @@
+{
+  "_설명": "스토어 장르 → 게임픽 장르 태그 (C7-a2). android = Google Play genreId, ios = App Store 장르 이름(한국어). 값이 null이면 그 장르 게임은 자동 추가하지 않음(카지노 등). 목록에 없는 장르도 추가하지 않고 로그에 남김.",
+  "android": {
+    "GAME_ACTION": "액션",
+    "GAME_ADVENTURE": "어드벤처",
+    "GAME_ARCADE": "캐주얼",
+    "GAME_BOARD": "퍼즐",
+    "GAME_CARD": "전략",
+    "GAME_CASINO": null,
+    "GAME_CASUAL": "캐주얼",
+    "GAME_EDUCATIONAL": "퍼즐",
+    "GAME_MUSIC": "캐주얼",
+    "GAME_PUZZLE": "퍼즐",
+    "GAME_RACING": "액션",
+    "GAME_ROLE_PLAYING": "RPG",
+    "GAME_SIMULATION": "시뮬레이션",
+    "GAME_SPORTS": "캐주얼",
+    "GAME_STRATEGY": "전략",
+    "GAME_TRIVIA": "퍼즐",
+    "GAME_WORD": "퍼즐"
+  },
+  "ios": {
+    "액션": "액션",
+    "어드벤처": "어드벤처",
+    "아케이드": "캐주얼",
+    "보드": "퍼즐",
+    "카드": "전략",
+    "카지노": null,
+    "캐주얼": "캐주얼",
+    "가족": "캐주얼",
+    "교육": "퍼즐",
+    "음악": "캐주얼",
+    "퍼즐": "퍼즐",
+    "레이싱": "액션",
+    "롤플레잉": "RPG",
+    "시뮬레이션": "시뮬레이션",
+    "스포츠": "캐주얼",
+    "전략": "전략",
+    "퀴즈": "퍼즐",
+    "단어": "퍼즐"
+  }
+}

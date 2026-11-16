@@ -1,0 +1,14 @@
+# 트랙 B: 웹 서버
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+python-dotenv==1.2.4
+
+# 배포 DB·아이콘 백업 (C10, Replit Object Storage). Python 3.13 미지원 → Replit(3.12)에서만 설치, 로컬 3.13은 건너뜀
+replit-object-storage==1.0.2; python_version < "3.13"
+
+# 테스트 (FastAPI TestClient)
+httpx==0.28.1
+
+# 트랙 A: 리뷰 크롤러 (Gemini 작성)
+google-play-scraper==1.2.7
+requests==2.34.2

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gamepick-debug",
+      "runtimeExecutable": "C:\\Users\\user\\anaconda3\\envs\\gamepic-project\\python.exe",
+      "runtimeArgs": ["app/main.py"],
+      "env": {"DEBUG": "true", "PYTHONIOENCODING": "utf-8"},
+      "port": 8000
+    }
+  ]
+}

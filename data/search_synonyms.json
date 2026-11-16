@@ -1,0 +1,28 @@
+{
+  "_설명": "검색 동의어 (PROJECT.md 4.11 C7-c). 단어 → include(이 태그를 모두 가진 게임) / exclude(이 태그가 있는 게임 제외). 태그는 '종류:이름'. 태그 이름과 똑같은 단어는 여기 없어도 태그로 찾음",
+  "words": {
+    "무료": {"exclude": ["bm:유료구매"], "label": "유료구매 제외"},
+    "공짜": {"exclude": ["bm:유료구매"], "label": "유료구매 제외"},
+    "유료": {"include": ["bm:유료구매"], "label": "유료구매"},
+    "무과금": {"include": ["bm:무과금가능"], "label": "무과금가능"},
+    "뽑기": {"include": ["bm:가챠"], "label": "가챠"},
+    "가차": {"include": ["bm:가챠"], "label": "가챠"},
+    "혼자": {"include": ["play:싱글"], "label": "싱글"},
+    "솔로": {"include": ["play:싱글"], "label": "싱글"},
+    "같이": {"include": ["play:멀티"], "label": "멀티"},
+    "친구": {"include": ["play:멀티"], "label": "멀티"},
+    "협동": {"include": ["play:멀티"], "label": "멀티"},
+    "온라인": {"include": ["play:멀티"], "label": "멀티"},
+    "경쟁": {"include": ["play:PvP"], "label": "PvP"},
+    "대전": {"include": ["play:PvP"], "label": "PvP"},
+    "자동": {"include": ["play:자동전투"], "label": "자동전투"},
+    "방치": {"include": ["subgenre:방치형RPG"], "label": "방치형RPG"},
+    "짧게": {"include": ["play:짧은플레이"], "label": "짧은플레이"},
+    "짧은": {"include": ["play:짧은플레이"], "label": "짧은플레이"},
+    "도트": {"include": ["view:픽셀아트"], "label": "픽셀아트"},
+    "픽셀": {"include": ["view:픽셀아트"], "label": "픽셀아트"},
+    "애니": {"include": ["view:애니풍"], "label": "애니풍"},
+    "귀여운": {"include": ["mood:귀여움"], "label": "귀여움"},
+    "스토리": {"include": ["mood:스토리중심"], "label": "스토리중심"}
+  }
+}

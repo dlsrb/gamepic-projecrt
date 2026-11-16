@@ -1,0 +1,374 @@
+/*
+ * 게임픽 공통 스타일 (PROJECT.md 4.4.2 디자인 톤)
+ * - 색은 전부 아래 변수로. 순백·순흑 사용 안 함
+ * - 명암비: 글자는 배경·카드 위에서 4.5:1 이상 (값 옆 주석은 확인한 명암비)
+ * - --accent(#A67C52)는 라이트에서 글자로 쓰면 3.6:1이라 장식(테두리·막대·점)에만 쓰고,
+ *   글자·버튼 배경에는 --accent-strong을 쓴다
+ */
+
+/* ---------- 글꼴 ---------- */
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/NanumSquareRoundR.ttf") format("truetype");
+}
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/NanumSquareRoundB.ttf") format("truetype");
+}
+@font-face {
+  font-family: "NanumSquareRound";
+  font-weight: 800;
+  font-display: swap;
+  src: url("../fonts/NanumSquareRoundEB.ttf") format("truetype");
+}
+
+/* ---------- 색·모양 변수 ---------- */
+:root {
+  color-scheme: light;
+  --bg: #F5EFE6;
+  --card: #FFFBF5;
+  --surface: #EFE5D6;          /* 칩·입력창 바탕 */
+  --line: #E2D6C4;
+  --text: #3D3A35;             /* bg 9.9 / card 11.0 / surface 9.1 */
+  --text-muted: #6E675D;       /* bg 4.9 / card 5.4 (surface 위에는 쓰지 않음) */
+  --accent: #A67C52;           /* 장식용 */
+  --accent-strong: #8A6440;    /* 글자: bg 4.6 / card 5.1 */
+  --on-accent: #FFFBF5;        /* accent-strong 위 글자 5.1 */
+  --accent-soft: #EADBC6;
+  --danger: #B3261E;           /* card 6.3 */
+  --thumb-from: #E9D9C2;
+  --thumb-to: #D8C0A0;
+  --shadow: 0 2px 10px rgba(61, 58, 53, 0.08);
+
+  --radius-card: 18px;
+  --radius-box: 16px;
+  --radius-pill: 999px;
+  --gap: 12px;
+  --page-max: 480px;
+  --nav-height: 56px;          /* 하단 메뉴 (C8-b) */
+  --font: "NanumSquareRound", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+
+/* 다크: 검정 계열. 직접 고른 다크 + (선택 안 했으면) 기기 설정이 다크일 때 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121212;
+  --card: #1E1E1E;
+  --surface: #2A2A2A;
+  --line: #333333;
+  --text: #E8E8E8;             /* bg 15.3 / card 13.6 / surface 11.7 */
+  --text-muted: #A8A8A8;       /* card 7.0 / surface 6.0 */
+  --accent: #C9A27A;
+  --accent-strong: #C9A27A;    /* 글자: card 7.1 / surface 6.1 */
+  --on-accent: #121212;        /* accent 위 글자 8.0 */
+  --accent-soft: #3A3127;
+  --danger: #F2B8B5;           /* card 9.8 */
+  --thumb-from: #2E2A25;
+  --thumb-to: #3D342A;
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121212;
+    --card: #1E1E1E;
+    --surface: #2A2A2A;
+    --line: #333333;
+    --text: #E8E8E8;
+    --text-muted: #A8A8A8;
+    --accent: #C9A27A;
+    --accent-strong: #C9A27A;
+    --on-accent: #121212;
+    --accent-soft: #3A3127;
+    --danger: #F2B8B5;
+    --thumb-from: #2E2A25;
+    --thumb-to: #3D342A;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ---------- 기본 ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* .btn·.chips처럼 display를 지정한 요소도 hidden이면 숨김 */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* 모바일 우선. PC에서는 가운데 정렬 + 최대 너비 */
+.app {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px 32px;
+}
+
+/* ---------- 상단바 ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  background: var(--bg);
+}
+.topbar__side { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.icon-btn--round { width: 40px; padding: 0; }
+.icon-btn.is-active { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
+.profile-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+/* ---------- 버튼 ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--primary { background: var(--accent-strong); color: var(--on-accent); }
+.btn--primary:hover { filter: brightness(1.05); }
+.btn--ghost { background: var(--card); border-color: var(--line); color: var(--text); }
+.btn--danger { background: var(--card); border-color: var(--danger); color: var(--danger); }
+.btn--block { width: 100%; }
+
+/* ---------- 입력 ---------- */
+.input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.input::placeholder { color: var(--text-muted); }
+
+/* ---------- 칩 (태그·키워드·설문 보기) ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+button.chip { min-height: 36px; padding: 4px 14px; font-size: 14px; }
+.chip.is-selected { background: var(--accent-strong); color: var(--on-accent); }
+.chip--removable::after { content: "×"; font-size: 14px; margin-left: 2px; }
+
+/* ---------- 카드·박스 ---------- */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+.section { margin-top: 20px; }
+.section__title { margin: 0 0 10px; font-size: 17px; font-weight: 800; }
+.section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.section__more { font-size: 13px; font-weight: 700; color: var(--accent-strong); padding: 4px 0; }
+
+/* 게임 카드: 홈·검색 3열 격자 (와이어프레임 02, 04) */
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+.game-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.game-card__thumb {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-box);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  background: var(--card);
+}
+.game-card__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.game-card__name {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.game-card__slot {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+}
+.game-card .chips { gap: 4px; }
+.game-card .chip { min-height: 22px; padding: 1px 7px; font-size: 11px; }
+.game-card:hover .game-card__thumb { transform: translateY(-2px); }
+.game-card__thumb { transition: transform 0.15s ease; }
+
+/* 썸네일이 없을 때: 그라데이션 + 이름 첫 글자 */
+.thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: linear-gradient(145deg, var(--thumb-from), var(--thumb-to));
+  color: var(--text);
+}
+.thumb-fallback__letter { font-size: 32px; font-weight: 800; line-height: 1; }
+.thumb-fallback__note { font-size: 11px; font-weight: 700; }
+
+/* 취향 부합도 % */
+.match {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.match--none { background: var(--surface); color: var(--text); }
+
+/* ---------- 빈 값·준비 중 ---------- */
+.empty {
+  padding: 20px 16px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-box);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.empty__icon { display: block; font-size: 24px; margin-bottom: 4px; }
+.placeholder-text { color: var(--text-muted); }
+
+/* ---------- 하단 메뉴 (C8-b) ---------- */
+.has-bottom-nav .app { padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 24px); }
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--page-max);
+  z-index: 20;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+}
+.bottom-nav__list { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; padding: 0; list-style: none; }
+.bottom-nav__item {
+  height: var(--nav-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.bottom-nav__icon { font-size: 20px; line-height: 1; filter: grayscale(1); opacity: 0.7; }
+.bottom-nav__item.is-active { color: var(--accent-strong); }
+.bottom-nav__item.is-active .bottom-nav__icon { filter: none; opacity: 1; }
+
+/* ---------- 알림 (오류 등) ---------- */
+.toast-area {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: calc(var(--page-max) - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+}
+.has-bottom-nav .toast-area { bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 12px); }
+.toast {
+  padding: 12px 16px;
+  border-radius: var(--radius-box);
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 700;
+  animation: toast-in 0.2s ease;
+}
+.toast--error { border-left: 6px solid var(--danger); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,20 @@
+# Replit 설정 (PROJECT.md 4.11 C10). Python 3.12: replit-object-storage가 3.13을 지원하지 않음
+modules = ["python-3.12"]
+
+# 작업 화면의 Run = 개발 실행 (app/main.py가 .env/Secrets의 HOST·PORT로 켬)
+run = "python app/main.py"
+
+[env]
+HOST = "0.0.0.0"
+PORT = "8000"
+
+# Reserved VM이 바깥 80번으로 받는 포트는 하나뿐 → 8000을 80에 연결 (Replit 문서: references/configuration/ports)
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[deployment]
+# Reserved VM 선택은 배포(Publishing) 화면에서 (deploymentTarget 값은 Replit이 적음)
+build = ["pip", "install", "-r", "requirements.txt"]
+# 실제 사용자 IP는 app/security.py의 client_ip()가 PROXY_HOPS로 직접 읽음 → uvicorn의 프록시 헤더 처리는 끔
+run = ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

@@ -1,0 +1,45 @@
+[
+  {"id": "dq8", "name": "드래곤 퀘스트 VIII", "genre": "RPG", "subgenre": ["턴제RPG"], "view": ["3D"], "play": ["싱글", "오프라인"], "mood": ["판타지", "스토리중심"], "bm": ["유료구매"], "indie": false},
+  {"id": "ff6", "name": "파이널 판타지 VI 픽셀 리마스터", "genre": "RPG", "subgenre": ["턴제RPG"], "view": ["2D", "픽셀아트"], "play": ["싱글", "오프라인"], "mood": ["판타지", "스토리중심"], "bm": ["유료구매"], "indie": false},
+  {"id": "chrono", "name": "크로노 트리거", "genre": "RPG", "subgenre": ["턴제RPG"], "view": ["2D", "픽셀아트"], "play": ["싱글", "오프라인"], "mood": ["판타지", "스토리중심"], "bm": ["유료구매"], "indie": false},
+  {"id": "dnfm", "name": "던전앤파이터 모바일", "genre": "RPG", "subgenre": ["액션RPG"], "view": ["2D", "횡스크롤"], "play": ["멀티", "빠른템포"], "mood": ["판타지"], "bm": ["무료+과금"], "indie": false},
+  {"id": "maplem", "name": "메이플스토리M", "genre": "RPG", "subgenre": ["MMORPG"], "view": ["2D", "횡스크롤"], "play": ["멀티", "자동전투"], "mood": ["귀여움", "판타지"], "bm": ["무료+과금"], "indie": false},
+  {"id": "lineagem", "name": "리니지M", "genre": "RPG", "subgenre": ["MMORPG"], "view": ["3D"], "play": ["멀티", "자동전투", "PvP"], "mood": ["다크판타지"], "bm": ["무료+과금", "가챠"], "indie": false},
+  {"id": "odin", "name": "오딘: 발할라 라이징", "genre": "RPG", "subgenre": ["MMORPG"], "view": ["3D", "실사풍"], "play": ["멀티", "자동전투", "PvP"], "mood": ["판타지"], "bm": ["무료+과금", "가챠"], "indie": false},
+  {"id": "genshin", "name": "원신", "genre": "RPG", "subgenre": ["액션RPG"], "view": ["3D", "애니풍"], "play": ["싱글", "오픈월드"], "mood": ["판타지", "스토리중심"], "bm": ["가챠"], "indie": false},
+  {"id": "hsr", "name": "붕괴: 스타레일", "genre": "RPG", "subgenre": ["턴제RPG"], "view": ["3D", "애니풍"], "play": ["싱글"], "mood": ["SF", "스토리중심"], "bm": ["가챠"], "indie": false},
+  {"id": "bluearchive", "name": "블루 아카이브", "genre": "RPG", "subgenre": ["수집형RPG"], "view": ["애니풍"], "play": ["싱글", "자동전투"], "mood": ["스토리중심", "귀여움"], "bm": ["가챠"], "indie": false},
+  {"id": "epic7", "name": "에픽세븐", "genre": "RPG", "subgenre": ["수집형RPG", "턴제RPG"], "view": ["2D", "애니풍"], "play": ["PvP"], "mood": ["판타지", "스토리중심"], "bm": ["가챠"], "indie": false},
+  {"id": "summoners", "name": "서머너즈 워", "genre": "RPG", "subgenre": ["수집형RPG", "턴제RPG"], "view": ["3D"], "play": ["PvP", "자동전투"], "mood": ["판타지"], "bm": ["가챠"], "indie": false},
+  {"id": "7kidle", "name": "세븐나이츠 키우기", "genre": "RPG", "subgenre": ["방치형RPG"], "view": ["2D"], "play": ["자동전투", "짧은플레이"], "mood": ["귀여움"], "bm": ["가챠", "광고"], "indie": false},
+  {"id": "mushroom", "name": "버섯커 키우기", "genre": "RPG", "subgenre": ["방치형RPG"], "view": ["2D", "픽셀아트"], "play": ["자동전투", "짧은플레이"], "mood": ["귀여움"], "bm": ["무료+과금", "광고"], "indie": false},
+  {"id": "cookiekingdom", "name": "쿠키런: 킹덤", "genre": "RPG", "subgenre": ["수집형RPG"], "view": ["2D"], "play": ["멀티", "자동전투"], "mood": ["귀여움"], "bm": ["가챠"], "indie": false},
+  {"id": "darkest", "name": "다키스트 던전", "genre": "RPG", "subgenre": ["로그라이크RPG", "턴제RPG"], "view": ["2D"], "play": ["싱글", "오프라인", "로그라이크"], "mood": ["다크판타지"], "bm": ["유료구매"], "indie": true},
+
+  {"id": "deadcells", "name": "데드 셀", "genre": "액션", "subgenre": ["로그라이트액션"], "view": ["2D", "픽셀아트", "횡스크롤"], "play": ["싱글", "오프라인", "로그라이크", "빠른템포"], "mood": ["다크판타지"], "bm": ["유료구매"], "indie": true},
+  {"id": "soulknight", "name": "소울 나이트", "genre": "액션", "subgenre": ["로그라이트액션"], "view": ["2D", "픽셀아트"], "play": ["싱글", "오프라인", "로그라이크", "짧은플레이", "빠른템포"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": true},
+  {"id": "brawl", "name": "브롤스타즈", "genre": "액션", "subgenre": ["대전액션"], "view": ["3D"], "play": ["멀티", "PvP", "짧은플레이", "빠른템포"], "mood": ["귀여움"], "bm": ["무료+과금", "무과금가능"], "indie": false},
+
+  {"id": "pubgm", "name": "배틀그라운드 모바일", "genre": "슈팅", "subgenre": ["배틀로얄"], "view": ["3D", "실사풍"], "play": ["멀티", "PvP", "빠른템포"], "mood": ["밀리터리"], "bm": ["무료+과금", "무과금가능"], "indie": false},
+  {"id": "codm", "name": "콜 오브 듀티: 모바일", "genre": "슈팅", "subgenre": ["FPS"], "view": ["3D", "실사풍"], "play": ["멀티", "PvP", "빠른템포"], "mood": ["밀리터리"], "bm": ["무료+과금", "무과금가능"], "indie": false},
+
+  {"id": "clashroyale", "name": "클래시 로얄", "genre": "전략", "subgenre": ["실시간전략"], "view": ["3D"], "play": ["멀티", "PvP", "짧은플레이"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": false},
+  {"id": "coc", "name": "클래시 오브 클랜", "genre": "전략", "subgenre": ["기지건설"], "view": ["3D"], "play": ["멀티", "PvP"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": false},
+  {"id": "wildrift", "name": "리그 오브 레전드: 와일드 리프트", "genre": "전략", "subgenre": ["MOBA"], "view": ["3D"], "play": ["멀티", "PvP", "빠른템포"], "mood": ["판타지"], "bm": ["무료+과금", "무과금가능"], "indie": false},
+  {"id": "slay", "name": "슬레이 더 스파이어", "genre": "전략", "subgenre": ["덱빌딩"], "view": ["2D"], "play": ["싱글", "오프라인", "로그라이크"], "mood": ["다크판타지"], "bm": ["유료구매"], "indie": true},
+
+  {"id": "candy", "name": "캔디크러시 사가", "genre": "퍼즐", "subgenre": ["매치3"], "view": ["2D"], "play": ["싱글", "짧은플레이"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": false},
+  {"id": "anipang4", "name": "애니팡4", "genre": "퍼즐", "subgenre": ["매치3"], "view": ["2D"], "play": ["싱글", "짧은플레이"], "mood": ["귀여움"], "bm": ["무료+과금", "광고"], "indie": false},
+  {"id": "royalmatch", "name": "로얄 매치", "genre": "퍼즐", "subgenre": ["매치3"], "view": ["2D"], "play": ["싱글", "짧은플레이"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": false},
+  {"id": "monument", "name": "모뉴먼트 밸리", "genre": "퍼즐", "subgenre": ["감성퍼즐"], "view": ["3D", "일러스트"], "play": ["싱글", "오프라인", "짧은플레이"], "mood": ["힐링", "감성"], "bm": ["유료구매"], "indie": true},
+
+  {"id": "stardew", "name": "스타듀 밸리", "genre": "시뮬레이션", "subgenre": ["농장경영"], "view": ["2D", "픽셀아트"], "play": ["싱글", "오프라인"], "mood": ["힐링"], "bm": ["유료구매"], "indie": true},
+  {"id": "minecraft", "name": "마인크래프트", "genre": "시뮬레이션", "subgenre": ["샌드박스"], "view": ["3D", "픽셀아트"], "play": ["싱글", "멀티"], "mood": ["힐링"], "bm": ["유료구매"], "indie": false},
+
+  {"id": "alto", "name": "알토의 오디세이", "genre": "캐주얼", "subgenre": ["러너"], "view": ["2D", "일러스트"], "play": ["싱글", "오프라인", "짧은플레이"], "mood": ["힐링", "감성"], "bm": ["광고"], "indie": true},
+  {"id": "cookierun", "name": "쿠키런: 오븐브레이크", "genre": "캐주얼", "subgenre": ["러너"], "view": ["2D"], "play": ["짧은플레이", "PvP"], "mood": ["귀여움"], "bm": ["가챠"], "indie": false},
+  {"id": "amongus", "name": "어몽어스", "genre": "캐주얼", "subgenre": ["파티"], "view": ["2D"], "play": ["멀티"], "mood": ["귀여움"], "bm": ["무료+과금", "광고"], "indie": true},
+
+  {"id": "gris", "name": "GRIS", "genre": "어드벤처", "subgenre": ["플랫포머"], "view": ["2D", "일러스트", "횡스크롤"], "play": ["싱글", "오프라인"], "mood": ["감성", "힐링"], "bm": ["유료구매"], "indie": true},
+  {"id": "pokemongo", "name": "포켓몬 GO", "genre": "어드벤처", "subgenre": ["위치기반"], "view": ["3D"], "play": ["멀티"], "mood": ["귀여움"], "bm": ["무료+과금"], "indie": false}
+]
