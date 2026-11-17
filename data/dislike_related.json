@@ -1,0 +1,11 @@
+{
+  "_설명": "비선호 연관 태그표 (PROJECT.md 4.11 C11-e). 왼쪽 태그를 비선호로 고르면 오른쪽 태그가 붙은 게임도 후보에서 뺀다 (점수는 안 바꿈). '종류:태그' 형식. 장르 → 그 장르의 세부 장르 전부, 캐주얼은 귀여움도 (본인 요청). 장르↔분위기 연결은 이것 말고 넣지 않음 (넓히면 후보가 바닥남). 세부 장르의 장르는 이름 기준 (실제 게임 장르가 섞여 있어도), 플랫포머·위치기반은 어드벤처, 샌드박스·농장경영은 시뮬레이션, 기지건설은 전략",
+  "genre:RPG": ["subgenre:턴제RPG", "subgenre:액션RPG", "subgenre:MMORPG", "subgenre:수집형RPG", "subgenre:방치형RPG", "subgenre:로그라이크RPG"],
+  "genre:액션": ["subgenre:로그라이트액션", "subgenre:대전액션"],
+  "genre:슈팅": ["subgenre:배틀로얄", "subgenre:FPS"],
+  "genre:전략": ["subgenre:실시간전략", "subgenre:기지건설", "subgenre:MOBA", "subgenre:덱빌딩"],
+  "genre:퍼즐": ["subgenre:매치3", "subgenre:감성퍼즐"],
+  "genre:시뮬레이션": ["subgenre:농장경영", "subgenre:샌드박스"],
+  "genre:캐주얼": ["subgenre:러너", "subgenre:파티", "mood:귀여움"],
+  "genre:어드벤처": ["subgenre:플랫포머", "subgenre:위치기반"]
+}
