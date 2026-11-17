@@ -4,7 +4,7 @@
 import {
   api, bottomNav, el, emptyState, gameGrid, matchBadge, pages, tagChip, textOr, thumbnail, toast, topBar,
 } from "/static/js/common.js";
-import { missingStoreMessage, storeUrl } from "/static/js/store.js";
+import { missingStoreMessage, storeTarget, storeUrl } from "/static/js/store.js";
 
 const COMMENT_MAX = 300, COMMENT_LINES = 10, COMMENT_PAGE = 20;
 
@@ -44,15 +44,34 @@ function likeButton(game) {
 }
 
 // ---------- 스토어 이동 (기기별 고르기는 store.js) ----------
-function openStore(game) {
-  const url = storeUrl(game, navigator);
-  if (!url) {
-    toast(missingStoreMessage(navigator));
-    return;
+// 스토어 이동 = 취향 점수 +0.5 (같은 게임은 하루 1회만 반영 — 서버에서 처리).
+// 페이지를 떠나도 요청이 끊기지 않게 sendBeacon, 안 되면 keepalive fetch (C11-a)
+function recordStoreVisit(game) {
+  const body = JSON.stringify({ game_id: game.id, type: "store" });
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon("/api/reactions", new Blob([body], { type: "application/json" }))) return;
+  } catch {
+    // 일부 브라우저는 JSON Blob 비콘을 막음 → 아래 fetch로
   }
-  window.open(url, "_blank", "noopener");
-  // 스토어 이동 = 취향 점수 +0.5 (같은 게임은 하루 1회만 반영 — 서버에서 처리)
-  api("/api/reactions", { method: "POST", body: { game_id: game.id, type: "store" }, silent: true }).catch(() => {});
+  fetch("/api/reactions", {
+    method: "POST", credentials: "same-origin", keepalive: true,
+    headers: { "Content-Type": "application/json", Accept: "application/json" }, body,
+  }).catch(() => {});
+}
+
+// 카드: 링크가 있으면 진짜 <a> (window.open은 iOS Safari에서 막히거나 새 탭이 닫히며 새로고침됨),
+// 없으면 버튼 → "준비 중" 알림 (기록 안 남김)
+function storeCard(game) {
+  const url = storeUrl(game, navigator);
+  const attrs = { class: "detail-card__thumb", "aria-label": `${game.name} 스토어로 이동` };
+  if (!url) {
+    return el("button", { ...attrs, type: "button", onclick: () => toast(missingStoreMessage(navigator)) }, thumbnail(game));
+  }
+  const target = storeTarget(navigator);
+  return el("a", {
+    ...attrs, href: url, target: target === "_blank" ? "_blank" : null, rel: "noopener",
+    onclick: () => recordStoreVisit(game),
+  }, thumbnail(game));
 }
 
 // ---------- 위쪽: 카드 + 이름·순위·키워드 ----------
@@ -60,8 +79,7 @@ function head(game) {
   const keywords = [...game.tags.genre, ...game.tags.subgenre, ...game.tags.view, ...game.tags.mood, ...game.tags.play].slice(0, 4);
   return el("div", { class: "detail-head" },
     el("div", { class: "detail-card" },
-      el("button", { type: "button", class: "detail-card__thumb", onclick: () => openStore(game), "aria-label": `${game.name} 스토어로 이동` },
-        thumbnail(game)),
+      storeCard(game),
       el("span", { class: "detail-card__hint" }, "누르면 스토어로"),
       matchBadge(game.match)),
     el("div", { class: "detail-info" },
@@ -417,7 +435,7 @@ async function start() {
       api(`/api/games/${encodeURIComponent(gameId)}/reviews`),
     ]);
     app.append(
-      topBar({ left: "back", right: [likeButton(game), "home"] }),
+      topBar({ left: "back", right: [likeButton(game)] }),
       head(game),
       videoSection(game),
       introSection(game),
@@ -427,7 +445,7 @@ async function start() {
       analysisSection(reviews),
     );
   } catch (error) {
-    app.append(topBar({ left: "back", right: ["home"] }),
+    app.append(topBar({ left: "back" }),
       emptyState(error.status === 404 || error.status === 422 ? "게임을 찾을 수 없어요" : error.message, "🔍"));
   }
   bottomNav();

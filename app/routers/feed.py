@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.db import get_db
 from app.deps import get_user
-from app.services import Catalog, card, match_feed, profile_for, ranking
+from app.services import Catalog, card, first_sentence, match_feed, profile_for, ranking
 
 router = APIRouter(prefix="/api", tags=["홈"])
 
@@ -62,6 +62,36 @@ def feed(section: Literal["match", "new", "popular"] = "match",
     return {"section": section, "games": items, "has_more": offset + limit < total}
 
 
+KEYWORD_CATEGORIES = ("subgenre", "play", "mood", "view", "bm")  # 신작 필터의 키워드 칸 (장르는 따로)
+
+
+@router.get("/new-games")
+def new_games(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
+    """
+    신작 페이지 (C11-d): 출시된 게임 전부를 한 번에 (출시 예정 = 오늘 이후 출시일은 뺌, 날짜 없는 게임은 넣음).
+    years = [올해, 작년]. 화면은 기본 올해작만, "전체 보기"(?all=1)에서 연도별 + 출시일 없음 (C11-h).
+    순서: 최신순 (날짜 없는 게임은 맨 뒤), 같은 연도 안에서는 /api/feed?section=new처럼 한글 이름·별점 있는 게임 먼저.
+    필터는 화면에서 거름 (게임이 수백 개 이하라 한 번에 받는 편이 단순·빠름). filters = 실제로 붙어 있는 태그만
+    """
+    catalog = Catalog(conn)
+    profile = profile_for(conn, user, catalog)
+    today = date.today()
+    released = [g for g in catalog.games if (catalog.rows[g["id"]]["release_date"] or "") <= today.isoformat()]
+    released.sort(key=lambda g: catalog.rows[g["id"]]["release_date"] or "", reverse=True)
+    released.sort(key=lambda g: ((catalog.rows[g["id"]]["release_date"] or "")[:4],
+                                 _familiar(g, catalog.rows[g["id"]])), reverse=True)  # 연도 안에서 익숙한 게임 먼저
+    used = {g["genre"] for g in released} | {t for g in released for c in KEYWORD_CATEGORIES for t in g[c]}
+    tags = conn.execute("SELECT category, name FROM tags ORDER BY id").fetchall()
+    return {
+        "years": [today.year, today.year - 1],
+        "games": [card(catalog, g, profile, release_date=catalog.rows[g["id"]]["release_date"]) for g in released],
+        "filters": {
+            "genre": [t["name"] for t in tags if t["category"] == "genre" and t["name"] in used],
+            "keyword": {c: [t["name"] for t in tags if t["category"] == c and t["name"] in used] for c in KEYWORD_CATEGORIES},
+        },
+    }
+
+
 HANGUL = re.compile(r"[가-힣]")
 
 
@@ -72,9 +102,10 @@ def _familiar(game: dict, row) -> bool:
 
 @router.get("/ranking")
 def get_ranking(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
-    """추천(따봉) 수 1~10위"""
+    """추천(따봉) 수 1~10위. summary = 게임 설명 첫 문장 (없으면 null → 화면은 장르·태그로 대신, C11-c)"""
     catalog = Catalog(conn)
     profile = profile_for(conn, user, catalog)
     return {"ranking": [card(catalog, catalog.get(item["game_id"]), profile,
-                             rank=item["rank"], like_count=item["like_count"])
+                             rank=item["rank"], like_count=item["like_count"],
+                             summary=first_sentence(catalog.rows[item["game_id"]]["description"]))
                         for item in ranking(conn, catalog)[:RANKING_SIZE]]}

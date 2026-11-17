@@ -2,7 +2,9 @@
 Replit에 올릴 파일 묶기 (PROJECT.md 4.11 C10, docs/C10_배포_지시.md 1단계 6)).
 
 dist/gamepick_replit.zip 을 만든다.
-- 뺌: .gitignore에 걸린 것(.env, DB, 아이콘, 로그, .idea, __pycache__ …) + legacy/, dist/, .git/, .claude/
+- 뺌: .gitignore에 걸린 것(.env, DB, 아이콘, 로그, .idea, __pycache__ …) + legacy/, dist/, .git/, .claude/, docs/
+  (docs/는 실행에 필요 없고, 한글 파일 이름 때문에 Replit에서 zip을 풀 때 invalid UTF-8로 배포가 실패했음 — C11-a)
+- zip 안 파일 이름은 ASCII만. 아니면 묶기 전에 NonAsciiName 오류로 멈춤
 - 넣음: data/seed.db (.gitignore의 data/*.db에 걸리지만 첫 배포의 시작용 DB라 예외)
 - .env 같은 비밀값 파일은 어떤 경우에도 넣지 않음
 묶은 파일 목록과 크기를 출력한다.
@@ -17,9 +19,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUT = BASE_DIR / "dist" / "gamepick_replit.zip"
-ALWAYS_SKIP = ["legacy/", "dist/", ".git/", ".claude/"]
+ALWAYS_SKIP = ["legacy/", "dist/", ".git/", ".claude/", "docs/"]
 FORCE_INCLUDE = {"data/seed.db"}
 NEVER_INCLUDE = {".env"}  # 비밀값 (.gitignore에서 빠져도 넣지 않음)
+
+
+class NonAsciiName(ValueError):
+    """zip에 넣을 파일 이름에 ASCII가 아닌 글자가 있음 (Replit에서 풀 때 깨짐)"""
 
 
 def read_ignore(base: Path) -> list[str]:
@@ -68,10 +74,14 @@ def pack(base: Path = BASE_DIR, out: Path = OUT) -> list[tuple[str, int]]:
     seed = base / "data" / "seed.db"
     if not seed.exists():
         raise FileNotFoundError("data/seed.db가 없습니다. 먼저 python scripts/make_seed_db.py 를 실행하세요.")
+    files = collect(base)
+    bad = [path.relative_to(base).as_posix() for path in files if not path.relative_to(base).as_posix().isascii()]
+    if bad:  # zip을 만들기 전에 멈춤 (반쯤 만든 zip이 남지 않게)
+        raise NonAsciiName("파일 이름이 ASCII가 아니라 Replit에서 풀 때 깨집니다: " + ", ".join(bad))
     out.parent.mkdir(parents=True, exist_ok=True)
     listed = []
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in collect(base):
+        for path in files:
             rel = path.relative_to(base).as_posix()
             zf.write(path, rel)
             listed.append((rel, path.stat().st_size))

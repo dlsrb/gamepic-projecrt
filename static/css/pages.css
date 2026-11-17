@@ -62,7 +62,11 @@
 .page-more { margin-top: 16px; }
 .store-rank { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
 .store-rank__item { position: relative; min-width: 0; }
-.store-rank__item > .rank-item__no { position: absolute; top: 6px; left: 6px; z-index: 1; width: 26px; height: 26px; font-size: 12px; box-shadow: var(--shadow); }
+.store-rank__item > .rank-item__no {  /* 스토어 인기 탭: 카드 위 동그라미 순위 (C11-c의 숫자만 표시는 추천 순위 목록에만) */
+  position: absolute; top: 6px; left: 6px; z-index: 1; width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--text);
+  font-weight: 800; font-size: 12px; box-shadow: var(--shadow);
+}
 .store-rank__item:nth-child(-n+3) > .rank-item__no { background: var(--accent-strong); color: var(--on-accent); }
 .game-card__date { font-size: 12px; color: var(--text-muted); }
 /* 페이지 안 탭 (랭킹, C8-b) */
@@ -71,14 +75,23 @@
 .rank-box { padding: 8px 16px; }
 .rank-list { list-style: none; margin: 0; padding: 0; }
 .rank-list li + li { border-top: 1px solid var(--line); }
-.rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+/* 순위 줄 (C11-c): 숫자 · 정사각 썸네일 · 제목/한 줄 설명 · 엄지 + 수 */
+.rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: inherit; text-decoration: none; }
 .rank-item__no {
-  flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center;
-  justify-content: center; background: var(--surface); font-weight: 800; font-size: 13px;
+  flex: none; width: 22px; text-align: center; font-weight: 700; font-size: 15px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
-.rank-list li:nth-child(-n+3) .rank-item__no { background: var(--accent-strong); color: var(--on-accent); }
-.rank-item__name { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rank-item__likes { flex: none; font-size: 13px; color: var(--text-muted); }
+.rank-item--top .rank-item__no { font-weight: 800; font-size: 17px; color: var(--text); }
+.rank-item__thumb {
+  flex: none; width: 52px; height: 52px; border-radius: 12px; overflow: hidden; background: var(--surface);
+}
+.rank-item__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rank-item__thumb .thumb-fallback__note { display: none; }  /* 작은 칸은 첫 글자만 */
+.rank-item__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rank-item__name, .rank-item__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-item__name { font-weight: 700; }
+.rank-item__sub { font-size: 12px; color: var(--text-muted); }
+.rank-item__likes { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-muted); }
 .recent-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
 .recent-item { flex: none; width: 84px; display: flex; flex-direction: column; gap: 4px; scroll-snap-align: start; }
 .recent-item__thumb { display: block; aspect-ratio: 1 / 1; border-radius: var(--radius-box); overflow: hidden; }
@@ -196,6 +209,7 @@
 
 /* ---------- 설문 (와이어프레임 01) ---------- */
 .survey { display: flex; flex-direction: column; justify-content: center; padding-top: 16px; }
+.survey-header { display: flex; align-items: center; padding: 10px 0 8px; }  /* 로고 (C11-b) */
 .survey-card { display: flex; flex-direction: column; gap: 12px; padding: 20px; overflow: hidden; }
 .survey-card--next { animation: slide-from-right 0.25s ease; }
 .survey-card--prev { animation: slide-from-left 0.25s ease; }
@@ -236,3 +250,24 @@
   border-radius: 0 0 var(--radius-card) var(--radius-card);
 }
 .survey-nav .btn { flex: 1; }
+
+/* ---------- 신작 연도별 칸·필터 (C11-d) ---------- */
+.new-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+.new-filter__toggle { min-height: 36px; padding: 4px 16px; }
+.new-filter__picked { flex: 1; min-width: 0; }
+.new-filter__reset { min-height: 36px; padding: 4px 12px; font-size: 13px; }
+.new-filter__panel { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; margin-bottom: 12px; }
+.new-filter__panel[hidden] { display: none; }
+.new-filter__title { margin: 4px 0 0; font-size: 15px; font-weight: 800; display: flex; align-items: baseline; gap: 8px; }
+.new-filter__note { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.new-filter__group { display: flex; flex-direction: column; gap: 4px; }
+.new-filter__group-label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.new-year__count { font-size: 13px; font-weight: 400; color: var(--text-muted); }
+
+/* ---------- 설문 보기 줄이기 (C11-f) ---------- */
+.survey-search { width: 100%; margin-top: 6px; }
+.survey-search__results:empty { display: none; }
+.survey-search__empty { margin: 0; font-size: 13px; color: var(--text-muted); }
+.survey-search__cat { margin-left: 4px; font-size: 11px; opacity: 0.75; }
+.survey-more { align-self: flex-start; min-height: 36px; padding: 4px 14px; font-size: 13px; }
+.survey-all { display: flex; flex-direction: column; gap: 8px; }

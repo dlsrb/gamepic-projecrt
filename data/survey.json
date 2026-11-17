@@ -29,12 +29,16 @@
     },
     {
       "id": "q3", "text": "선호하는 키워드를 골라 주세요", "hint": "2개 이상", "required": true, "min": 2,
-      "options": {"from": "tags", "categories": ["genre", "subgenre"], "as": "like"}
+      "options": {"from": "tags", "categories": ["genre", "subgenre", "play", "mood"], "as": "like"},
+      "featured": {"genre": ["genre:RPG", "genre:액션", "genre:퍼즐", "genre:시뮬레이션", "genre:캐주얼"],
+                   "keyword": ["mood:힐링", "mood:귀여움", "mood:판타지", "mood:스토리중심", "play:PvP"]}
     },
     {
-      "id": "q4", "text": "싫어하거나 피하고 싶은 것을 골라 주세요", "hint": "고른 것이 들어간 게임은 추천하지 않아요",
+      "id": "q4", "text": "싫어하거나 피하고 싶은 것을 골라 주세요", "hint": "고른 것이 들어간 게임은 추천하지 않아요 (장르를 고르면 그 세부 장르처럼 가까운 것도)",
       "required": true, "min": 1,
       "options": {"from": "tags", "categories": ["genre", "subgenre", "play", "mood"], "as": "dislike"},
+      "featured": {"genre": ["genre:RPG", "genre:액션", "genre:퍼즐", "genre:시뮬레이션", "genre:캐주얼"],
+                   "keyword": ["play:PvP", "play:자동전투", "mood:다크판타지", "mood:밀리터리", "play:멀티"]},
       "extra_options": [{"label": "딱히 없어요", "value": "none", "exclusive": true}]
     },
     {

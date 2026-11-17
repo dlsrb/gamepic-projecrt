@@ -147,24 +147,35 @@ function backButton() {
 }
 
 /**
- * 상단바. 와이어프레임대로 왼쪽은 🌙(홈) 또는 ←(나머지), 오른쪽은 버튼 목록.
- *   topBar({ left: "theme", right: ["profile"], nickname })                    // 홈 (C8-b: 설정은 하단 메뉴로)
- *   topBar({ left: "back", right: [likeButtonElement, "home"] })              // 상세
- * right에는 "home" | "profile" | "settings" | "theme" 또는 직접 만든 요소를 넣는다.
+ * 로고 GAMEPICK (C11-b). 이미지가 아니라 글자: GAME = 남색, PICK = 밝은 회청색 채움 + 남색 얇은 테두리 (다크는 밝은 색).
+ * 기본은 누르면 홈(/). onClick을 주면 링크 대신 버튼(설문의 "그만둘까요?" 확인), static이면 누를 수 없는 글자.
  */
-export function topBar({ left = "back", right = ["home"], nickname = null } = {}) {
+export function logo({ onClick = null, isStatic = false } = {}) {
+  const word = [el("span", { class: "logo__game" }, "GAME"), el("span", { class: "logo__pick" }, "PICK")];
+  if (isStatic) return el("span", { class: "logo", role: "img", "aria-label": "GamePick" }, word);
+  if (onClick) return el("button", { type: "button", class: "logo", "aria-label": "GamePick 홈으로", onclick: onClick }, word);
+  return el("a", { class: "logo", href: "/", "aria-label": "GamePick 홈으로" }, word);
+}
+
+/**
+ * 상단바. 왼쪽: (← 뒤로) + 로고(누르면 홈), 오른쪽: 버튼 목록.
+ *   topBar({ left: "theme", right: ["profile"], nickname })   // 홈: 로고만, 🌙은 오른쪽으로 (C11-b)
+ *   topBar({ left: "back", right: [likeButtonElement] })      // 상세
+ * right에는 "profile" | "settings" | "theme" 또는 직접 만든 요소. 오른쪽 위 "홈" 버튼은 로고가 대신해서 없앰 (C11-b)
+ */
+export function topBar({ left = "back", right = [], nickname = null } = {}) {
   const make = {
     theme: themeButton,
     back: backButton,
-    home: () => el("a", { class: "icon-btn", href: pages.home() }, "홈"),
     settings: () => el("a", { class: "icon-btn", href: pages.settings() }, "설정"),
     profile: () => el("a", { class: "profile-dot", href: pages.mypage(), "aria-label": "마이페이지" },
       nickname ? nickname.slice(0, 1) : "나"),
   };
   const build = (item) => (item instanceof Node ? item : make[item]());
+  const rightItems = [...(left === "theme" ? ["theme"] : []), ...right.filter((item) => item !== "home")];
   return el("header", { class: "topbar" },
-    el("div", { class: "topbar__side" }, left ? build(left) : null),
-    el("div", { class: "topbar__side" }, right.map(build)));
+    el("div", { class: "topbar__side" }, left === "back" ? backButton() : null, logo()),
+    el("div", { class: "topbar__side" }, rightItems.map(build)));
 }
 
 // ---------- 하단 메뉴 (C8-b) ----------
@@ -301,15 +312,45 @@ export function gameSlider(games, { empty = "보여 줄 게임이 아직 없어�
   return el("div", { class: "slider-wrap" }, slider, el("div", { class: "slider__dots" }, dots));
 }
 
-/** 추천(따봉) 순위 목록 (홈 상위 5개·랭킹 페이지 공통, /api/ranking 형식) */
+// ---------- 선 아이콘 (인라인 SVG, innerHTML 없이 만듦) ----------
+const SVG_NS = "http://www.w3.org/2000/svg";
+const ICON_PATHS = {
+  // 엄지 (Lucide thumbs-up, ISC 라이선스)
+  thumb: ["M7 10v12", "M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"],
+};
+
+export function lineIcon(name, { size = 16, className = "line-icon" } = {}) {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  for (const [key, value] of Object.entries({
+    viewBox: "0 0 24 24", width: size, height: size, fill: "none", stroke: "currentColor", "stroke-width": 2,
+    "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false", class: className,
+  })) svg.setAttribute(key, value);
+  for (const d of ICON_PATHS[name]) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+}
+
+/**
+ * 추천(따봉) 순위 목록 (홈 상위 5개·랭킹 페이지 공통, /api/ranking 형식). C11-c:
+ * 순위 숫자(동그라미 없이, 1~3위 굵게) · 정사각 썸네일 · 제목 + 한 줄 설명(없으면 장르·태그 2개) · 선 아이콘 엄지 + 추천 수
+ */
 export function rankList(ranking) {
-  if (!ranking.length) return emptyState("아직 추천(👍)을 받은 게임이 없어요", "🏆");
-  return el("ol", { class: "rank-list" }, ranking.map((g) =>
-    el("li", {},
-      el("a", { class: "rank-item", href: pages.game(g.id) },
+  if (!ranking.length) return emptyState("아직 추천을 받은 게임이 없어요", "🏆");
+  return el("ol", { class: "rank-list" }, ranking.map((g) => {
+    const sub = g.summary || [g.genre, ...(g.tags || []).slice(0, 2)].filter(Boolean).join(" · ");
+    return el("li", {},
+      el("a", { class: `rank-item${g.rank <= 3 ? " rank-item--top" : ""}`, href: pages.game(g.id) },
         el("span", { class: "rank-item__no" }, `${g.rank}`),
-        el("span", { class: "rank-item__name" }, g.name),
-        el("span", { class: "rank-item__likes" }, `👍 ${g.like_count}`)))));
+        el("span", { class: "rank-item__thumb" }, thumbnail(g)),
+        el("span", { class: "rank-item__text" },
+          el("span", { class: "rank-item__name" }, g.name),
+          sub ? el("span", { class: "rank-item__sub" }, sub) : null),
+        el("span", { class: "rank-item__likes", "aria-label": `추천 ${g.like_count}` },
+          lineIcon("thumb"), el("span", {}, `${g.like_count}`))));
+  }));
 }
 
 /** 카드 3열 격자. 목록이 비면 대체 표시 */

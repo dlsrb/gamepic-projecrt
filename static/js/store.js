@@ -19,6 +19,13 @@ export function storeUrl(game, nav) {
   return game.android_url || game.ios_url || null;
 }
 
+// 링크를 여는 곳 (C11-a). iOS Safari는 새 탭으로 App Store를 열면 그 탭이 앱으로 넘어가며 닫히고,
+// 돌아왔을 때 게임픽 탭이 새로고침되어 "안 열리고 새로고침"처럼 보임 → iOS는 같은 탭으로 넘김
+// (App Store 주소는 앱이 받아 열어서 게임픽 페이지는 그대로 남음). 나머지는 새 탭
+export function storeTarget(nav) {
+  return platformOf(nav) === "ios" ? "_self" : "_blank";
+}
+
 export function missingStoreMessage(nav) {
   const platform = platformOf(nav);
   if (platform === "ios") return "App Store 링크 준비 중이에요";

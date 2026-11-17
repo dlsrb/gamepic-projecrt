@@ -12,3 +12,7 @@ httpx==0.28.1
 # 트랙 A: 리뷰 크롤러 (Gemini 작성)
 google-play-scraper==1.2.7
 requests==2.34.2
+
+# 보안 하한 (C11-a): Replit 배포 보안 검사가 낮은 버전을 critical 취약점으로 막았음 (간접 의존성)
+anyio>=4.14.2
+certifi>=2026.10.18

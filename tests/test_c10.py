@@ -211,7 +211,7 @@ class SeedAndPackTest(ApiTestCase):
                  "app/main.py": "x", "app/__pycache__/m.pyc": "x", ".env": "SECRET=1", "data/gamepick.db": "x",
                  "data/seed.db": "x", "data/survey.json": "{}", "static/img/games/a.png": "x", "static/css/b.css": "x",
                  "logs/a.log": "x", "legacy/old.py": "x", ".claude/launch.json": "x", ".replit": "x",
-                 "sub/.env": "SECRET=2"}
+                 "sub/.env": "SECRET=2", "docs/C11_지시.md": "x", "docs/plain.md": "x"}   # docs/는 통째로 뺌 (C11-a)
         for rel, text in files.items():
             (base / rel).parent.mkdir(parents=True, exist_ok=True)
             (base / rel).write_text(text, encoding="utf-8")
@@ -220,6 +220,18 @@ class SeedAndPackTest(ApiTestCase):
         names = sorted(zipfile.ZipFile(out).namelist())
         self.assertEqual(names, [".gitignore", ".replit", "app/main.py", "data/seed.db", "data/survey.json",
                                  "static/css/b.css"])
+
+    def test_pack_stops_on_non_ascii_name(self):
+        """C11-a: 한글 파일 이름은 Replit에서 zip을 풀 때 깨짐 → 묶기 전에 멈춤, zip을 만들지 않음"""
+        base = Path(self.tmp.name) / "proj"
+        for rel in ("data/seed.db", "app/main.py", "static/img/게임.png"):
+            (base / rel).parent.mkdir(parents=True, exist_ok=True)
+            (base / rel).write_text("x", encoding="utf-8")
+        out = Path(self.tmp.name) / "out.zip"
+        with self.assertRaises(pack_for_replit.NonAsciiName) as caught:
+            pack_for_replit.pack(base, out)
+        self.assertIn("static/img/게임.png", str(caught.exception))
+        self.assertFalse(out.exists())
 
 
 class FakeStoreClient:

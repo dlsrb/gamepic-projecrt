@@ -13,6 +13,7 @@ DEBUG = (os.getenv("DEBUG") or "false").lower() == "true"
 DB_PATH = Path(os.getenv("DB_PATH") or BASE_DIR / "data" / "gamepick.db")
 STATIC_DIR = BASE_DIR / "static"
 SURVEY_PATH = BASE_DIR / "data" / "survey.json"  # 설문 문항 (4.12 확정 후 작성)
+DISLIKE_RELATED_PATH = BASE_DIR / "data" / "dislike_related.json"  # 비선호 연관 태그표 (C11-e)
 # 배포(HTTPS) 때 true로. 로컬 http에서는 false여야 쿠키가 저장된다.
 COOKIE_SECURE = (os.getenv("COOKIE_SECURE") or "false").lower() == "true"
 # 서버 안에서 스토어 자동 수집을 하루 1번 (C7-a2). 끄려면 false

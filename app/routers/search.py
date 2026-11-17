@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.config import BASE_DIR
 from app.db import get_db
 from app.deps import get_user
-from app.reco.recommender import FEATURE_FIELDS, game_features
+from app.reco.recommender import FEATURE_FIELDS, game_features, label_of
 from app.security import rate_limit
 from app.services import Catalog, card, profile_for, tag_names
 
@@ -85,6 +85,7 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
        예: "무료 2D" = 유료구매가 아니면서 2D인 게임
     tags: 쉼표로 구분한 태그 이름 (모두 가진 게임만, 예전 방식도 그대로 받음)
     검색어 전체가 게임 이름과 같으면 그 게임이 맨 앞, 나머지는 취향 부합도 높은 순.
+    비선호(+연관 태그, C11-e)가 붙은 게임은 뺀다. 단 이름을 정확히 친 게임, 직접 검색한 태그 때문에 걸리는 경우는 남김
     검색어는 search_logs에 남긴다 (사용자 ID 없이).
     """
     words = q.split()
@@ -100,10 +101,17 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
     all_tags = {t for g in catalog.games for t in tag_names(g)}
     terms = interpret(words, all_tags) + interpret(selected, all_tags)
     exact = _normalize(q)
+    searched = {n for t in terms if t["kind"] == "tag" for n in t["include"]}
+    searched |= {label_of(f) for t in terms if t["kind"] == "synonym" for f in t["include"]}
+    excluded = {f for f in profile.excluded if label_of(f) not in searched}
     found = []
     for game in catalog.games:
-        if _matches(game, terms):
-            found.append(card(catalog, game, profile, exact=bool(exact) and _normalize(game["name"]) == exact))
+        if not _matches(game, terms):
+            continue
+        is_exact = bool(exact) and _normalize(game["name"]) == exact
+        if not is_exact and set(game_features(game)) & excluded:
+            continue
+        found.append(card(catalog, game, profile, exact=is_exact))
     found.sort(key=lambda c: (not c["exact"], -c["match"]))
 
     if q:

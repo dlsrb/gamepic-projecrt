@@ -2,9 +2,12 @@
 여러 라우터가 같이 쓰는 조회·가공 (게임 카드, 추천 수·순위, 실험 그룹별 취향).
 추천 계산 자체는 app/reco/, 여기서는 DB 결과를 화면용 모양으로 맞춘다.
 """
+import json
 import random
+import re
 import sqlite3
 
+from app import config
 from app.reco import repository as repo
 from app.reco.reco_config import EXPLORE_RATIO, HOME_MIN_TAGS
 from app.reco.recommender import (
@@ -51,6 +54,18 @@ def card(catalog: Catalog, game: dict, profile: UserProfile | None = None, **ext
     return data
 
 
+SENTENCE_END = re.compile(r"(?<=[.!?。！？])\s+")
+SUMMARY_MAX = 120
+
+
+def first_sentence(text: str | None) -> str | None:
+    """게임 설명의 첫 줄·첫 문장 (랭킹 한 줄 설명, C11-c). 화면에서 한 줄 넘치면 말줄임"""
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    return SENTENCE_END.split(" ".join(lines[0].split()), maxsplit=1)[0][:SUMMARY_MAX]
+
+
 # ---------- 추천 수·순위 ----------
 def like_counts(conn: sqlite3.Connection) -> dict[str, int]:
     rows = conn.execute("SELECT game_id, COUNT(*) AS n FROM reactions WHERE type = 'like' GROUP BY game_id")
@@ -81,12 +96,36 @@ def rank_of(conn: sqlite3.Connection, catalog: Catalog, game_id: str) -> int | N
     return None
 
 
+# ---------- 비선호 연관 태그 (C11-e) ----------
+_related_cache: dict = {"key": None, "table": {}}
+
+
+def dislike_related() -> dict[str, list[str]]:
+    """data/dislike_related.json ('종류:태그' → 같이 뺄 태그 목록). 파일이 바뀌면 다시 읽음, 없으면 빈 표"""
+    path = config.DISLIKE_RELATED_PATH
+    try:
+        key = (str(path), path.stat().st_mtime_ns)
+    except FileNotFoundError:
+        return {}
+    if _related_cache["key"] != key:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        _related_cache.update(key=key, table={k: list(v) for k, v in data.items() if not k.startswith("_")})
+    return _related_cache["table"]
+
+
+def expand_dislikes(features: set[str]) -> set[str]:
+    """비선호 태그 + 연관 태그 (한 단계만, 연관 태그의 연관은 안 따라감)"""
+    table = dislike_related()
+    return set(features) | {r for f in features for r in table.get(f, [])}
+
+
 # ---------- 실험 그룹별 취향 ----------
 def profile_for(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog) -> UserProfile:
     """
     feedback: 현재 태그 점수 (설문 + 반응)
     survey / random: 설문 시작 점수만 (반응은 점수에 안 씀)
     이미 반응한 게임·좋아하는 게임을 다시 추천하지 않는 것(seen)과 비선호 제외는 세 그룹 모두 같다.
+    비선호 제외는 연관 태그까지 넓힘 (C11-e, data/dislike_related.json) — 저장된 답은 그대로라 기존 사용자도 바로 적용
     """
     current = repo.load_profile(conn, user["id"])
     if user["exp_group"] == "feedback":
@@ -94,6 +133,7 @@ def profile_for(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog) -
     else:
         profile = build_profile(repo.load_survey(conn, user["id"]), catalog.by_id)
         profile.seen = current.seen
+    profile.excluded = expand_dislikes(profile.excluded)
     set_best_score(profile, catalog.games)  # 취향 %의 '1등 대비' 기준 (요청마다 한 번, C7-e)
     return profile
 

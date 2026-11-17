@@ -37,7 +37,7 @@ function start() {
     box.replaceChildren(await (tab.key === "store" ? storeTab() : pickTab()));
   };
   app.append(
-    topBar({ left: "back", right: ["home"] }),
+    topBar({ left: "back" }),
     el("h1", { class: "section__title page-title" }, "랭킹"),
     bar, box);
   bottomNav("ranking");

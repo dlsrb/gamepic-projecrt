@@ -155,7 +155,7 @@ function start() {
   q = new URLSearchParams(location.search).get("q") || "";
   input.value = q;
   app.append(
-    topBar({ left: "back", right: ["home"] }),
+    topBar({ left: "back" }),
     el("form", { class: "search-form", role: "search", onsubmit: submit },
       input, el("button", { type: "submit", class: "btn btn--primary" }, "검색")),
     suggestBox, keywordBox, results);

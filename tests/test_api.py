@@ -150,7 +150,7 @@ class SurveyTest(ApiTestCase):
         self.assertEqual(sum(1 for q in qs if "show_if" in q), 1)
         self.assertEqual([q["id"] for q in qs if q.get("required")], ["q1", "q2", "q3", "q4", "q5"])
         by_id = {q["id"]: q for q in qs}
-        self.assertEqual(len(by_id["q3"]["options"]), 8 + 22)  # 장르 + 세부 장르
+        self.assertEqual(len(by_id["q3"]["options"]), 8 + 22 + 9 + 8)  # 장르 + 세부 장르 + 플레이 + 분위기 (C11-f에서 플레이·분위기 추가)
         self.assertEqual(len(by_id["q5"]["options"]), 36 + 1)  # 게임 + 없어요
         self.assertNotIn("engine", by_id["q2"]["options"][0])  # 엔진 반영 방법은 화면에 안 보냄
         turn = next(o for o in by_id["q3"]["options"] if o["value"] == "subgenre:턴제RPG")

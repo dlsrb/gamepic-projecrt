@@ -106,7 +106,7 @@ function tasteSection(taste) {
 async function start() {
   const [me, taste] = await Promise.all([api("/api/me"), api("/api/me/taste")]);
   app.append(
-    topBar({ left: "back", right: ["home"] }),
+    topBar({ left: "back" }),
     nicknameBlock(me),
     badges(),
     tasteSection(taste),

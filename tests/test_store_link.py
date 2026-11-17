@@ -58,6 +58,15 @@ class StoreUrlTest(unittest.TestCase):
         self.assertEqual(result, [["android", "https://play/x", "Google Play 링크 준비 중이에요"],
                                   ["android", None, "Google Play 링크 준비 중이에요"]])
 
+    def test_ios_opens_in_same_tab_others_new_tab(self):
+        """C11-a: iOS Safari는 새 탭 App Store가 닫히며 게임픽이 새로고침됨 → iOS만 같은 탭"""
+        script = (f"import {{ storeTarget }} from {json.dumps(STORE_JS.as_uri())};\n"
+                  f"console.log(JSON.stringify({json.dumps([IPHONE, IPAD_DESKTOP, ANDROID, WINDOWS, MAC])}"
+                  ".map((nav) => storeTarget(nav))));")
+        out = subprocess.run([NODE, "--input-type=module", "-e", script], capture_output=True, text=True,
+                             encoding="utf-8", timeout=30, check=True)
+        self.assertEqual(json.loads(out.stdout), ["_self", "_self", "_blank", "_blank", "_blank"])
+
     def test_pc_prefers_play_then_app_store(self):
         result = self.run_js([(WINDOWS, BOTH), (WINDOWS, IOS_ONLY), (MAC, IOS_ONLY), (WINDOWS, {})])
         self.assertEqual([r[:2] for r in result], [["pc", "https://play/x"], ["pc", "https://apple/x"],

@@ -57,29 +57,55 @@ def _tag_engine(category: str, name: str, genres: list[str], as_: str) -> dict:
     return {f"likes.{category}": [name]}
 
 
+def tag_aliases() -> dict[str, list[str]]:
+    """검색 동의어(data/search_synonyms.json)에서 태그 하나만 가리키는 단어 → 설문 보기 검색용 (C11-f). '종류:태그' → [단어]"""
+    path = config.BASE_DIR / "data" / "search_synonyms.json"
+    if not path.exists():
+        return {}
+    aliases: dict[str, list[str]] = {}
+    for word, entry in json.loads(path.read_text(encoding="utf-8")).get("words", {}).items():
+        include = entry.get("include", [])
+        if len(include) == 1 and not entry.get("exclude"):
+            aliases.setdefault(include[0], []).append(word)
+    return aliases
+
+
 def tag_options(conn: sqlite3.Connection, categories: list[str], as_: str) -> list[dict]:
     genres_of = _tag_genres(conn)
+    aliases = tag_aliases()
     options = []
     for category in categories:
         for row in conn.execute("SELECT name FROM tags WHERE category = ? ORDER BY id", (category,)):
             genres = genres_of.get((category, row["name"]), [])
-            options.append({"label": row["name"], "value": f"{category}:{row['name']}", "category": category,
-                            "genres": genres, "engine": _tag_engine(category, row["name"], genres, as_)})
+            value = f"{category}:{row['name']}"
+            options.append({"label": row["name"], "value": value, "category": category,
+                            "genres": genres, "aliases": aliases.get(value, []),
+                            "engine": _tag_engine(category, row["name"], genres, as_)})
     return options
 
 
 def game_options(conn: sqlite3.Connection) -> list[dict]:
+    """5번 보기: 화면에 보이는 게임 전부 (C11-f: 검색창으로 어떤 게임이든 고를 수 있게. 전에는 직접 고른 36개만).
+    화면이 3번 답에 맞는 대표작 3개를 고를 수 있게 태그(features)·추천 수(likes)·설치 수(installs)를 같이 보냄"""
+    features: dict[str, list[str]] = {}
+    for row in conn.execute("SELECT gt.game_id, t.category, t.name FROM game_tags gt JOIN tags t ON t.id = gt.tag_id "
+                            "ORDER BY gt.rowid"):
+        features.setdefault(row["game_id"], []).append(f"{row['category']}:{row['name']}")
+    likes = {row["game_id"]: row["n"] for row in conn.execute(
+        "SELECT game_id, COUNT(*) AS n FROM reactions WHERE type = 'like' GROUP BY game_id")}
     rows = conn.execute(
         """
-        SELECT g.id, g.name, g.thumbnail_url, t.name AS genre FROM games g
+        SELECT g.id, g.name, g.thumbnail_url, g.installs, t.name AS genre FROM games g
         JOIN game_tags gt ON gt.game_id = g.id
         JOIN tags t ON t.id = gt.tag_id AND t.category = 'genre'
-        WHERE g.source = 'manual' AND g.review_status = 'ok'  -- 설문 보기는 직접 고른 게임만 (자동 수집이 늘어도 고정)
+        WHERE g.review_status = 'ok'
         ORDER BY g.rowid
         """
     )
     return [{"label": row["name"], "value": row["id"], "genres": [row["genre"]],
-             "thumbnail_url": row["thumbnail_url"], "engine": {"favorites": [row["id"]]}} for row in rows]
+             "thumbnail_url": row["thumbnail_url"], "features": features.get(row["id"], []),
+             "likes": likes.get(row["id"], 0), "installs": row["installs"] or 0,
+             "engine": {"favorites": [row["id"]]}} for row in rows]
 
 
 def resolve(conn: sqlite3.Connection, question: dict) -> dict:
@@ -95,6 +121,9 @@ def resolve(conn: sqlite3.Connection, question: dict) -> dict:
         raise ValueError(f"알 수 없는 options: {spec}")
     resolved = {k: v for k, v in question.items() if k not in ("options", "extra_options")}
     resolved["options"] = options + [dict(o) for o in question.get("extra_options", [])]
+    if "featured" in question:  # 처음 보이는 대표 보기 (C11-f). 보기에 없는 값은 버림 (태그가 바뀌어도 화면이 안 깨지게)
+        values = {o["value"] for o in resolved["options"]}
+        resolved["featured"] = {k: [v for v in vs if v in values] for k, vs in question["featured"].items()}
     return resolved
 
 

@@ -98,7 +98,7 @@ const infoPanel = (lines) => () => el("ul", { class: "settings-info" }, lines.ma
 async function start() {
   const me = await api("/api/me");
   app.append(
-    topBar({ left: "back", right: ["home"] }),
+    topBar({ left: "back" }),
     el("h1", { class: "section__title settings-title" }, "설정"),
     group("화면", themeRow()),
     group("취향",
