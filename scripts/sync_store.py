@@ -9,6 +9,8 @@
    - 같은 게임 판정: 스토어 ID가 같거나(App Store bundleId = Android 패키지 포함), 이름 유사도 0.6 이상 + 개발사가 같을 때만 합침.
      이름은 비슷한데 개발사가 다르면 합치지 않고 검수 대기(review_status=pending, 화면에 안 나옴)
    - 장르: data/store_genre_map.json, 나머지 태그: data/tag_keywords.json + 가격·인앱결제·광고 → game_tags.auto = 1
+   - Google Play 태그 칩(app()의 categories 중 id 없는 것) → data/store_tag_map.json으로 우리 태그를 더함 (C12-j).
+     대응되는 칩이 하나라도 있으면 games.tag_source = 'store' (아니면 'auto'). checked는 아님
    - 인디 여부: data/indie_developers.json에 있으면 1, 아니면 미정(NULL)
    - 아이콘: static/img/games/{id}.png
 4. 최근 출시작 (C7-f): 차트와 상관없이 출시 NEW_RELEASE_DAYS일 이내·이미 출시된 게임을 설치 수·별점 수 기준 없이 넣음
@@ -47,6 +49,7 @@ from google_play_scraper.exceptions import NotFoundError  # noqa: E402
 
 from app.config import DB_PATH, STATIC_DIR  # noqa: E402
 from app.db import get_connection  # noqa: E402
+from app.rankings import save_daily_snapshot  # noqa: E402
 from scripts.fetch_game_meta import APPSTORE_URL, PLAY_URL, similarity  # noqa: E402
 
 DATA_DIR = BASE_DIR / "data"
@@ -202,7 +205,18 @@ def from_play(package: str, info: dict) -> dict:
         "iap": bool(info.get("offersIAP")), "ads": bool(info.get("containsAds")),
         "text": " ".join(str(info.get(k) or "") for k in ("title", "summary", "description")),
         "is_game": str(info.get("genreId") or "").startswith("GAME"),
+        "store_chips": play_chips(info),
     }
+
+
+def play_chips(info: dict) -> list[str]:
+    """Play 페이지 태그 칩 이름 ("싱글 플레이어" 등). categories 중 id가 있는 것은 Play 장르라 뺌 (C12-j)"""
+    return list(dict.fromkeys(c["name"] for c in info.get("categories") or [] if not c.get("id") and c.get("name")))
+
+
+def chip_tags(chips: list[str], chip_map: dict) -> list[str]:
+    """태그 칩 → 우리 태그 '종류:이름' 목록 (중복 없이, 대응표에 없는 칩은 버림)"""
+    return list(dict.fromkeys(feature for chip in chips for feature in chip_map.get(chip, [])))
 
 
 def from_ios(info: dict) -> dict:
@@ -222,6 +236,7 @@ def from_ios(info: dict) -> dict:
         "text": " ".join(str(info.get(k) or "") for k in ("trackName", "description")),
         "is_game": info.get("primaryGenreId") == IOS_GAME_GENRE
         or str(IOS_GAME_GENRE) in [str(g) for g in info.get("genreIds", [])],
+        "store_chips": [],  # App Store는 태그 칩이 없음 (장르 목록뿐)
     }
 
 
@@ -328,6 +343,7 @@ class Sync:
         self.since = (today - timedelta(days=NEW_RELEASE_DAYS)).isoformat()
         self.genre_map = load_json("store_genre_map.json")
         self.keywords = load_json("tag_keywords.json")
+        self.chip_map = load_json("store_tag_map.json")  # C12-j
         self.indie = {normalize_developer(d) for d in load_json("indie_developers.json")["developers"]}
         self.report = {"added": 0, "updated": 0, "pending": 0, "failed": 0, "skipped": 0, "notes": [],
                        # 최근 출시작 (C7-f)
@@ -521,6 +537,11 @@ class Sync:
         self.add_tag(game_id, f"genre:{genre}")
         for feature in keyword_tags(app["text"], self.keywords) + bm_tags(app):
             self.add_tag(game_id, feature)
+        store_features = chip_tags(app.get("store_chips", []), self.chip_map)  # C12-j: Play 태그 칩
+        for feature in store_features:
+            self.add_tag(game_id, feature)
+        if store_features:
+            self.conn.execute("UPDATE games SET tag_source = 'store' WHERE id = ?", (game_id,))
         icon = self.save_icon(game_id, app["icon_url"])
         self.conn.execute("UPDATE games SET thumbnail_url = ? WHERE id = ?", (icon, game_id))
         if status == "pending":  # 개수는 아래에서 경로(차트·신작)별로 셈
@@ -728,6 +749,8 @@ def run_sync(db_path=None, client=None, limit: int = NEW_GAME_LIMIT, today: date
         try:
             with get_connection(db_path) as conn:
                 report = Sync(conn, client or StoreClient(), limit, today, new_limit).run()
+                report["snapshot"] = save_daily_snapshot(conn, today)  # 인기 급상승용 하루 기록 (C12-e)
+                conn.commit()
             status = "ok"
             return report
         finally:

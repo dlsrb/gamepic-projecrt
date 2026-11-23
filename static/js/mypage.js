@@ -92,7 +92,7 @@ function radar(axes) {
 }
 
 function tasteSection(taste) {
-  if (!taste.axes.some((a) => a.count > 0)) return section("취향 분석", emptyState("설문을 하면 취향 분석이 보여요", "📈"));
+  if (!taste.axes.some((a) => a.count > 0)) return section("취향 분석", emptyState("설문을 하면 취향 분석이 보여요"));
   return section("취향 분석",
     el("div", { class: "card my-taste" },
       radar(taste.axes),

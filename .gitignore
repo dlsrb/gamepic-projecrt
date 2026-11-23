@@ -13,3 +13,6 @@ dist/
 .idea/
 __pycache__/
 .venv/
+
+# 태그 검수 작업 파일 (scripts/tag_review.py --export로 언제든 다시 만듦, C12-a)
+data/tag_review.csv

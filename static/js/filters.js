@@ -2,7 +2,7 @@
 // 장르는 하나라도 맞으면(OR), 키워드는 고른 것이 모두 있어야(AND), 장르와 키워드는 AND
 export function matchesFilter(game, genres, keywords) {
   if (genres.size && !genres.has(game.genre)) return false;
-  const tags = new Set(game.tags || []);
+  const tags = new Set(game.keywords || game.tags || []);  // keywords = 화면 칩과 별개인 전체 태그 (C12-a: 미검수 게임은 칩이 장르만)
   return [...keywords].every((k) => tags.has(k));
 }
 

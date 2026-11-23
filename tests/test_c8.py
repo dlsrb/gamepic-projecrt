@@ -24,7 +24,8 @@ class HomeSliderTest(ApiTestCase):
     def add_two_tag_game(self):
         """취향(RPG·턴제RPG)과 딱 맞는 태그 2개짜리 게임"""
         conn = self.db()
-        conn.execute("INSERT INTO games (id, name, source) VALUES ('twotag', '두 태그 RPG', 'auto')")
+        # tags_checked=1: 이 테스트는 태그 수 규칙만 봄 (미검수 자동 수집 게임은 C12-a부터 맞춤 추천에서 아예 빠짐)
+        conn.execute("INSERT INTO games (id, name, source, tags_checked) VALUES ('twotag', '두 태그 RPG', 'auto', 1)")
         conn.execute("INSERT INTO game_tags (game_id, tag_id, auto) SELECT 'twotag', id, 1 FROM tags "
                      "WHERE (category = 'genre' AND name = 'RPG') OR (category = 'subgenre' AND name = '턴제RPG')")
         conn.commit()

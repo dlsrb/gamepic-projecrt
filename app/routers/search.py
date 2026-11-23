@@ -42,7 +42,7 @@ def _synonyms() -> dict:
 def interpret(words: list[str], all_tags: set[str]) -> list[dict]:
     """
     단어마다 해석 (C7-c): ① 태그 이름과 같으면 태그 ② 동의어 사전 ③ 아니면 이름·태그 부분 일치.
-    반환: [{word, kind: tag|synonym|text, label, include, exclude}]
+    반환: [{word, kind: tag|synonym|badge|text, label, include, exclude}]
     """
     synonyms = _synonyms()
     by_lower = {t.lower(): t for t in all_tags}
@@ -52,6 +52,10 @@ def interpret(words: list[str], all_tags: set[str]) -> list[dict]:
         if lower in by_lower:
             terms.append({"word": word, "kind": "tag", "label": by_lower[lower],
                           "include": [by_lower[lower]], "exclude": []})
+        elif word in synonyms and synonyms[word].get("badge"):  # 자동 배지 (C12-e): "신작"·"인디"·"인기"·"급상승"
+            entry = synonyms[word]
+            terms.append({"word": word, "kind": "badge", "label": entry.get("label", word),
+                          "include": [entry["badge"]], "exclude": []})
         elif word in synonyms:
             entry = synonyms[word]
             terms.append({"word": word, "kind": "synonym", "label": entry.get("label", word),
@@ -61,11 +65,13 @@ def interpret(words: list[str], all_tags: set[str]) -> list[dict]:
     return terms
 
 
-def _matches(game: dict, terms: list[dict]) -> bool:
-    """모든 단어를 만족해야 (AND)"""
+def _matches(game: dict, terms: list[dict], badges=None) -> bool:
+    """모든 단어를 만족해야 (AND). badges = BadgeBook (자동 배지 단어가 있을 때)"""
     names = set(tag_names(game))
     features = set(game_features(game))
     for term in terms:
+        if term["kind"] == "badge" and not (badges and badges.has(game["id"], term["include"][0])):
+            return False
         if term["kind"] == "tag" and not set(term["include"]) <= names:
             return False
         if term["kind"] == "synonym" and (not set(term["include"]) <= features or set(term["exclude"]) & features):
@@ -106,7 +112,7 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
     excluded = {f for f in profile.excluded if label_of(f) not in searched}
     found = []
     for game in catalog.games:
-        if not _matches(game, terms):
+        if not _matches(game, terms, catalog.badges):
             continue
         is_exact = bool(exact) and _normalize(game["name"]) == exact
         if not is_exact and set(game_features(game)) & excluded:

@@ -20,7 +20,8 @@ function releaseLabel(date, thisYear) {
 }
 
 function newCard(game, thisYear) {
-  const card = gameCard(game, { maxTags: 2 });
+  // 신작 페이지에선 "신작" 배지가 모든 카드에 붙어 의미가 없어서 뺌 (C12-f)
+  const card = gameCard({ ...game, badges: (game.badges || []).filter((b) => b !== "신작") }, { maxTags: 2 });
   card.append(el("span", { class: "game-card__date" }, releaseLabel(game.release_date, thisYear)));
   return card;
 }
@@ -66,7 +67,7 @@ async function start() {
   try {
     data = await api("/api/new-games");
   } catch (error) {
-    box.replaceChildren(emptyState(error.message || "신작을 불러오지 못했어요", "✨"));
+    box.replaceChildren(emptyState(error.message || "신작을 불러오지 못했어요"));
     return;
   }
   const [thisYear] = data.years;
@@ -121,7 +122,7 @@ async function start() {
     const groups = yearGroups(games, thisYear, all);
     if (!groups.length) {
       const what = all ? "신작" : `${thisYear}년작`;
-      box.replaceChildren(emptyState(count ? `조건에 맞는 ${what}이 없어요` : `보여 줄 ${what}이 아직 없어요`, "✨"));
+      box.replaceChildren(emptyState(count ? `조건에 맞는 ${what}이 없어요` : `보여 줄 ${what}이 아직 없어요`));
       return;
     }
     box.replaceChildren(...groups.map(([title, list]) => yearSection(title, list, thisYear, all ? PAGE_ALL : PAGE)));

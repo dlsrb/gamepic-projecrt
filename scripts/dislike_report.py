@@ -1,13 +1,17 @@
 """
-비선호 연관 태그 적용 전/후 표 (PROJECT.md 4.11 C11-e).
+추천 후보 전/후 표 (PROJECT.md 4.11 C11-e 비선호 연관 태그, C12-a 태그 검수 안 된 게임 빼기, C12-i 모자라면 채우기).
 
 실제 DB를 임시 사본으로 복사해서(원본은 안 바꿈) 실제 사용자 + 시뮬 사용자마다
   - 추천 후보 수 (passes_filter 통과: 이미 본 게임·장르 필터·비선호·필수 태그)
   - 홈 슬라이드 장 수 (홈과 같은 /api/feed?section=match&limit=9&min_match=60, 기준 미달이면 대체 동작)
-를 연관 태그 없이(전) / 있게(후) 계산해 마크다운 표로 출력한다. 후보가 MIN_CANDIDATES 미만인 사용자는 ⚠ 표시.
+를 바꾸기 전 / 후로 계산해 마크다운 표로 출력한다. 후보가 MIN_CANDIDATES 미만인 사용자는 ⚠ 표시.
+  --compare dislike (기본): 비선호 연관 태그 없이(전) / 있게(후)
+  --compare checked       : 미검수 자동 수집 게임 포함(전) / 지금 규칙(후) — 맞춤 추천 후보 기준
+  --compare fill          : 세 칸 — C12 전(미검수 포함) / C12 후(검수된 게임만) / C12-i 후(모자라면 미검수로 채움)
 
-실행: python scripts/dislike_report.py
+실행: python scripts/dislike_report.py [--compare checked|fill]
 """
+import argparse
 import sqlite3
 import sys
 import tempfile
@@ -43,12 +47,23 @@ SIMS = {
 def measure(conn, user) -> tuple[int, int, bool]:
     catalog = services.Catalog(conn)
     profile = services.profile_for(conn, user, catalog)
-    candidates = sum(1 for g in catalog.games if passes_filter(g, profile))
+    candidates = sum(1 for g in services.recommendation_pool(catalog, profile) if passes_filter(g, profile))  # 맞춤 추천 후보
     slides, fallback = services.match_feed(conn, user, catalog, HOME_LIMIT, HOME_MIN_MATCH)
     return candidates, len(slides), fallback
 
 
-def report(db_path: Path = DB_PATH) -> list[dict]:
+ALL_GAMES = lambda: mock.patch.object(services, "recommendation_pool", lambda catalog, profile: list(catalog.games))  # noqa: E731
+NO_FILL = lambda: mock.patch.object(services, "unchecked_fill", lambda catalog, profile: [])  # noqa: E731  C12 그대로 (채우기 없음)
+# 비교마다 앞 칸들의 바꾸기 (마지막 칸 = 지금 코드 그대로)
+COLUMNS = {
+    "dislike": [lambda: mock.patch.object(services, "expand_dislikes", lambda features: set(features))],
+    "checked": [ALL_GAMES],
+    "fill": [ALL_GAMES, NO_FILL],
+}
+BEFORE_PATCHES = COLUMNS  # 예전 이름
+
+
+def report(db_path: Path = DB_PATH, compare: str = "dislike") -> list[dict]:
     with tempfile.TemporaryDirectory() as tmp:
         copy = Path(tmp) / "report.db"
         src, dst = sqlite3.connect(db_path), sqlite3.connect(copy)
@@ -71,10 +86,12 @@ def report(db_path: Path = DB_PATH) -> list[dict]:
             rows = []
             for name, user_id in users:
                 user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-                with mock.patch.object(services, "expand_dislikes", lambda features: set(features)):
-                    before = measure(conn, user)
-                after = measure(conn, user)
-                rows.append({"user": name, "before": before, "after": after})
+                columns = []
+                for patch in COLUMNS[compare]:
+                    with patch():
+                        columns.append(measure(conn, user))
+                columns.append(measure(conn, user))
+                rows.append({"user": name, "columns": columns, "before": columns[0], "after": columns[-1]})
             return rows
         finally:
             conn.close()
@@ -83,13 +100,21 @@ def report(db_path: Path = DB_PATH) -> list[dict]:
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    print("| 사용자 | 후보 전 → 후 | 홈 슬라이드 전 → 후 |")
+    parser = argparse.ArgumentParser(description="추천 후보 전/후 표")
+    parser.add_argument("--compare", choices=sorted(COLUMNS), default="dislike")
+    args = parser.parse_args()
+    note = lambda n, f: f"{n}장" + (" (대체 동작)" if f else "")  # noqa: E731
+    if args.compare == "fill":
+        print("| 사용자 | 후보 C12 전 → C12 후 → C12-i 후 | 홈 슬라이드 C12 전 → C12 후 → C12-i 후 |")
+    else:
+        print("| 사용자 | 후보 전 → 후 | 홈 슬라이드 전 → 후 |")
     print("|---|---|---|")
-    for row in report():
-        (cb, sb, fb), (ca, sa, fa) = row["before"], row["after"]
-        warn = " ⚠" if ca < MIN_CANDIDATES else ""
-        note = lambda n, f: f"{n}장" + (" (대체 동작)" if f else "")  # noqa: E731
-        print(f"| {row['user']} | {cb} → **{ca}**{warn} | {note(sb, fb)} → {note(sa, fa)} |")
+    for row in report(compare=args.compare):
+        last = row["columns"][-1][0]
+        warn = " ⚠" if last < MIN_CANDIDATES else ""
+        counts = " → ".join(str(c[0]) for c in row["columns"][:-1]) + f" → **{last}**{warn}"
+        slides = " → ".join(note(c[1], c[2]) for c in row["columns"])
+        print(f"| {row['user']} | {counts} | {slides} |")
 
 
 if __name__ == "__main__":

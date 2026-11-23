@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS {name} (
     source             TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'auto')),
     source_feed        TEXT NOT NULL DEFAULT 'manual' CHECK (source_feed IN ('manual', 'chart', 'new')),  -- 들어온 경로 (C7-f)
     review_status      TEXT NOT NULL DEFAULT 'ok' CHECK (review_status IN ('ok', 'pending', 'rejected')),
+    tags_checked       INTEGER NOT NULL DEFAULT 0 CHECK (tags_checked IN (0, 1)),  -- 자동 수집 게임의 태그를 사람이 검수함 (C12-a)
+    tag_source         TEXT NOT NULL DEFAULT 'auto' CHECK (tag_source IN ('auto', 'store', 'ai', 'human')),  -- 태그를 누가 붙였나 (C12-j)
     updated_at         TEXT                             -- 스토어 정보 마지막 갱신 (UTC, YYYY-MM-DD HH:MM:SS)
 );"""
 
@@ -140,6 +142,16 @@ CREATE TABLE IF NOT EXISTS comment_votes (              -- 댓글 추천·비추
 );
 CREATE INDEX IF NOT EXISTS idx_comment_votes_user ON comment_votes (user_id);
 
+CREATE TABLE IF NOT EXISTS game_stats_daily (           -- 하루 1번 게임별 숫자 스냅샷 (인기 급상승 계산, C12-e)
+    day                TEXT NOT NULL,                   -- YYYY-MM-DD (로컬 날짜)
+    game_id            TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    installs           INTEGER,
+    rating_count       INTEGER,
+    chart_rank_android INTEGER,
+    chart_rank_ios     INTEGER,
+    PRIMARY KEY (day, game_id)
+);
+
 CREATE TABLE IF NOT EXISTS sync_runs (                  -- 스토어 자동 수집 실행 기록 (C7-a2)
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at  TEXT NOT NULL,
@@ -169,12 +181,16 @@ ADDED_COLUMNS = (
     ("game_tags", "auto", "INTEGER NOT NULL DEFAULT 0"),
     # C7-f
     ("games", "source_feed", "TEXT NOT NULL DEFAULT 'manual' CHECK (source_feed IN ('manual', 'chart', 'new'))"),
+    # C12-a
+    ("games", "tags_checked", "INTEGER NOT NULL DEFAULT 0 CHECK (tags_checked IN (0, 1))"),
+    # C12-j
+    ("games", "tag_source", "TEXT NOT NULL DEFAULT 'auto' CHECK (tag_source IN ('auto', 'store', 'ai', 'human'))"),
 )
 
 TABLES = (
     "users", "games", "tags", "game_tags", "survey_answers",
     "user_tag_scores", "reactions", "review_stats", "review_topics", "search_logs", "sync_runs", "comments",
-    "comment_votes",
+    "comment_votes", "game_stats_daily",
 )
 
 
@@ -216,6 +232,14 @@ def add_missing_columns(conn):
         existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         if existing and column not in existing:  # 테이블이 아예 없으면 SCHEMA가 만든다
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
+    backfill_tag_source(conn)
+
+
+def backfill_tag_source(conn):
+    """C12-j: 직접 넣은 게임(source='manual', games.json)의 태그는 사람이 붙인 것 → tag_source='human'. 여러 번 돌려도 같음"""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(games)")}
+    if "tag_source" in columns:
+        conn.execute("UPDATE games SET tag_source = 'human' WHERE source = 'manual' AND tag_source = 'auto'")
 
 
 def migrate_games_tier(conn) -> bool:
@@ -267,6 +291,7 @@ def prepare(conn, games):
     add_missing_columns(conn)
     migrate_games_tier(conn)
     load_games(conn, games)
+    backfill_tag_source(conn)  # 방금 넣은 games.json 게임
     backfill_store_ids(conn)
     # C7-f 이전 자동 수집은 모두 차트 경로
     conn.execute("UPDATE games SET source_feed = 'chart' WHERE source = 'auto' AND source_feed = 'manual'")

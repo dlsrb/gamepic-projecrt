@@ -206,7 +206,7 @@ class FeedTest(ApiTestCase):
         self.assertEqual(sum(g["slot"] == "탐색" for g in games), 2)
         self.assertTrue(all(isinstance(g["match"], int) and 0 <= g["match"] <= 100 for g in games))
         self.assertEqual(set(games[0]), {"id", "name", "genre", "tags", "tier", "indie", "thumbnail_url",
-                                         "match", "slot", "reasons"})
+                                         "match", "slot", "reasons", "badges"})  # badges: C12-e
 
     def test_random_group_filters_only(self):
         self.new_user("random")
@@ -293,7 +293,9 @@ class FeedTest(ApiTestCase):
         self.assertFalse(plain["fallback"])
         body = self.client.get("/api/feed?section=match&limit=9&min_match=100").json()
         self.assertTrue(body["fallback"])
-        self.assertEqual([g["id"] for g in body["games"]], [g["id"] for g in plain["games"]])
+        # 추천 칸은 같은 순서. 탐색 칸은 C12-a부터 상위 후보 중 무작위라 개수만 비교
+        main = lambda games: [g["id"] for g in games if g["slot"] == "추천"]  # noqa: E731
+        self.assertEqual(main(body["games"]), main(plain["games"]))
         self.assertEqual(len(body["games"]), 9)
 
     def test_min_match_random_group(self):
@@ -359,7 +361,7 @@ class DetailTest(ApiTestCase):
         blend = [g["similarity"] * 0.6 + g["match"] * 0.4 for g in games]
         self.assertEqual(blend, sorted(blend, reverse=True))
         self.assertEqual(set(games[0]), {"id", "name", "genre", "tags", "tier", "indie", "thumbnail_url",
-                                         "match", "similarity"})
+                                         "match", "similarity", "badges"})  # badges: C12-e
 
     def test_reviews_not_ready_then_temp(self):
         self.assertEqual(self.client.get("/api/games/dq8/reviews").json(),

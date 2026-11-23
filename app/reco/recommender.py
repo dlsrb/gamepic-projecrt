@@ -16,10 +16,11 @@
 설문 문항 응답 → 이 형식 변환은 survey_map.py.
 """
 import math
+import random
 
 from app.reco.reco_config import (
     CATEGORY_WEIGHTS, INITIAL_SCORE, SURVEY_WEIGHT, FAVORITE_WEIGHT, DISLIKE_WEIGHT,
-    FEEDBACK_DELTA, WEIGHT_MIN, WEIGHT_MAX, EXPLORE_RATIO,
+    FEEDBACK_DELTA, WEIGHT_MIN, WEIGHT_MAX, EXPLORE_RATIO, EXPLORE_POOL,
     MATCH_COVERAGE_RATIO, MATCH_RELATIVE_RATIO, MATCH_NEGATIVE_PENALTY, MATCH_MAX, MATCH_MIN_TAGS,
 )
 
@@ -175,7 +176,7 @@ def passes_filter(game: dict, profile: UserProfile) -> bool:
 
 
 def recommend(games: list[dict], profile: UserProfile, k: int = 10,
-              explore_ratio: float = EXPLORE_RATIO) -> list[dict]:
+              explore_ratio: float = EXPLORE_RATIO, rng: random.Random | None = None) -> list[dict]:
     # 1단계: 후보 거르기
     candidates = [g for g in games if passes_filter(g, profile)]
     # 2단계: 순위 매기기
@@ -191,15 +192,22 @@ def recommend(games: list[dict], profile: UserProfile, k: int = 10,
     for item in main:
         item["slot"] = "추천"
 
-    # 탐색 슬롯: 후보(=장르 필터 통과) 안에서, 아직 안 뽑힌 인디 게임 중 점수가 양수인 것
+    # 탐색 슬롯: 후보(=장르 필터 통과) 안에서, 아직 안 뽑힌 인디 게임 중 점수가 양수인 것.
+    # 점수 순으로 채우면 매번 같은 게임이 떠서(C12-a) 점수 상위 EXPLORE_POOL개 안에서 무작위로 고른다
+    rng = rng or random
     rest = scored[n_main:]
-    explore = [x for x in rest if x["game"].get("indie") and x["score"] > 0][:n_explore]
+
+    def draw(pool: list[dict], n: int) -> list[dict]:
+        pool = pool[:EXPLORE_POOL]
+        return [pool[i] for i in sorted(rng.sample(range(len(pool)), min(n, len(pool))))]  # 뽑은 것끼리는 점수 순
+
+    explore = draw([x for x in rest if x["game"].get("indie") and x["score"] > 0], n_explore)
     for item in explore:
         item["slot"] = "탐색"
-    # 인디가 부족하면 남은 후보로 채운다
+    # 인디가 부족하면 남은 후보로 채운다 (여기도 상위 EXPLORE_POOL개 중 무작위)
     if len(explore) < n_explore:
         picked = {id(x) for x in explore}
-        filler = [x for x in rest if id(x) not in picked][: n_explore - len(explore)]
+        filler = draw([x for x in rest if id(x) not in picked], n_explore - len(explore))
         for item in filler:
             item["slot"] = "탐색"
         explore += filler

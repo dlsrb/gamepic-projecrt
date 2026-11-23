@@ -4,6 +4,7 @@
 실제 DB는 건드리지 않고, 메모리 DB에 games.json을 적재해서 쓴다.
 """
 import json
+import random
 import sqlite3
 import sys
 import unittest
@@ -331,8 +332,10 @@ class MatchPercentTest(unittest.TestCase):
         """추천 순서는 score(코사인) 그대로 — 취향 %를 바꿔도 같다"""
         survey = {"genres": ["RPG"], "subgenres": ["턴제RPG"], "favorites": ["dq8"]}
         plain = build_profile(survey, self.by_id)
-        before = [(r["game"]["id"], r["slot"]) for r in recommend(self.games, plain, k=10)]
-        after = [(r["game"]["id"], r["slot"]) for r in recommend(self.games, self.profile(survey), k=10)]
+        # 탐색 칸은 C12-a부터 무작위 → 같은 씨앗으로 비교
+        before = [(r["game"]["id"], r["slot"]) for r in recommend(self.games, plain, k=10, rng=random.Random(1))]
+        after = [(r["game"]["id"], r["slot"])
+                 for r in recommend(self.games, self.profile(survey), k=10, rng=random.Random(1))]
         self.assertEqual(before, after)
         scores = [r["score"] for r in recommend(self.games, plain, k=10, explore_ratio=0)]
         self.assertEqual(scores, sorted(scores, reverse=True))

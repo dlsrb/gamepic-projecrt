@@ -22,7 +22,8 @@ from app.config import DB_PATH  # noqa: E402
 SEED_PATH = BASE_DIR / "data" / "seed.db"
 # 사용자 데이터 (users를 지우면 연쇄 삭제되지만, 빠짐없이 비었는지 확인하려고 하나씩 지운다)
 USER_TABLES = ("comment_votes", "comments", "reactions", "user_tag_scores", "survey_answers", "users", "search_logs")
-KEEP_TABLES = ("games", "tags", "game_tags", "review_stats", "review_topics", "sync_runs")
+KEEP_TABLES = ("games", "tags", "game_tags", "review_stats", "review_topics", "sync_runs",
+               "game_stats_daily")  # 스냅샷은 사용자 데이터가 아니라 남김 (C12-e: 다시 배포해도 급상승 기록이 이어지게)
 
 
 def make_seed(src: Path, out: Path) -> dict[str, int]:

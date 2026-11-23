@@ -97,7 +97,7 @@ document.getElementById("app").append(
     gameGrid(sampleGames, { maxTags: 2 }),
     gameGrid([], { empty: "추천할 게임이 아직 없어요" })),
   section("빈 값 대체 표시",
-    emptyState("리뷰 분석 준비 중", "📊"),
+    emptyState("리뷰 분석 준비 중"),
     el("p", {}, "개발사: ", textOr(null)),
     el("p", {}, "설명: ", textOr("한 줄 설명이 있으면 그대로 보입니다."))),
   section("알림·API 호출",

@@ -42,9 +42,12 @@ def game_detail(game_id: GameIdPath, user=Depends(get_user), conn: sqlite3.Conne
     return {
         "id": game_id,
         "name": game["name"],
-        "tags": {c: ([game[c]] if c == "genre" else game[c]) for c in FEATURE_FIELDS},
+        # 미검수 자동 수집 게임은 장르만 보임 (C12-a)
+        "tags": {c: ([game[c]] if c == "genre" else game[c] if catalog.checked(game) else []) for c in FEATURE_FIELDS},
+        "tags_checked": catalog.checked(game),
         **{c: row[c] for c in GAME_DETAIL_COLUMNS},
         "indie": game["indie"],
+        "badges": catalog.badges.of(game_id),  # C12-e (화면의 "인디" 칩은 이 배지로)
         "match": match_percent(game, profile),
         "reasons": reasons(game, profile),
         "like_count": like_count(conn, game_id),

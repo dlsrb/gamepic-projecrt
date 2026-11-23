@@ -3,16 +3,17 @@
 추천 계산 자체는 app/reco/, 여기서는 DB 결과를 화면용 모양으로 맞춘다.
 """
 import json
+import math
 import random
 import re
 import sqlite3
 
 from app import config
 from app.reco import repository as repo
-from app.reco.reco_config import EXPLORE_RATIO, HOME_MIN_TAGS
+from app.reco.reco_config import CHECKED_MIN_CANDIDATES, EXPLORE_RATIO, FILL_SCORE_STEP, HOME_MIN_TAGS
 from app.reco.recommender import (
     FEATURE_FIELDS, UserProfile, build_profile, game_features, label_of, match_percent, passes_filter, reasons,
-    recommend, set_best_score,
+    recommend, score, set_best_score,
 )
 
 GAME_DETAIL_COLUMNS = ("developer", "tier", "description", "thumbnail_url", "video_url", "android_url", "ios_url",
@@ -24,12 +25,29 @@ class Catalog:
     """요청 하나 동안 쓰는 게임 목록 (태그 포함) + games 테이블의 나머지 컬럼."""
 
     def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
         self.games = repo.load_games(conn)
         self.by_id = {g["id"]: g for g in self.games}
         self.rows = {row["id"]: row for row in conn.execute("SELECT * FROM games")}
 
     def get(self, game_id: str) -> dict | None:
         return self.by_id.get(game_id)
+
+    def checked(self, game: dict) -> bool:
+        """태그를 믿을 수 있는 게임 (C12-a): 직접 넣은 게임(source='manual') 또는 사람이 검수한 자동 수집 게임"""
+        row = self.rows[game["id"]]
+        return row["source"] != "auto" or bool(row["tags_checked"])
+
+    def checked_games(self) -> list[dict]:
+        return [g for g in self.games if self.checked(g)]
+
+    @property
+    def badges(self):
+        """자동 배지 (C12-e, app/rankings.py). 요청 하나에서 처음 쓸 때 한 번 계산"""
+        if not hasattr(self, "_badges"):
+            from app.rankings import BadgeBook
+            self._badges = BadgeBook(self)
+        return self._badges
 
 
 def tag_names(game: dict) -> list[str]:
@@ -44,11 +62,13 @@ def card(catalog: Catalog, game: dict, profile: UserProfile | None = None, **ext
         "id": game["id"],
         "name": game["name"],
         "genre": game["genre"],
-        "tags": tag_names(game)[1:],
+        # 화면 태그 칩: 검수된 게임만 태그, 미검수 자동 수집 게임은 장르 하나만 (C12-a)
+        "tags": tag_names(game)[1:] if catalog.checked(game) else [game["genre"]],
         "tier": row["tier"],
         "indie": game["indie"],
         "thumbnail_url": row["thumbnail_url"],
         "match": match_percent(game, profile) if profile is not None else None,
+        "badges": catalog.badges.of(game["id"]),  # 신작·인기·급상승·인디 (C12-e)
     }
     data.update(extra)
     return data
@@ -141,6 +161,30 @@ def profile_for(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog) -
 MIN_MATCH_FLOOR = 3  # min_match를 넘는 게임이 이보다 적으면 기준 없이 취향 높은 순 (C7-d)
 
 
+def recommendation_pool(catalog: Catalog, profile: UserProfile) -> list[dict]:
+    """
+    맞춤 추천에 쓸 게임 목록 (C12-a·C12-i). 태그 검수된 게임이 기본.
+    검수된 게임 중 후보(passes_filter: 비선호·연관 태그·이미 본 게임·장르 필터)가 CHECKED_MIN_CANDIDATES개 미만이면
+    미검수 게임 중 같은 거르기를 통과한 것을 그 수까지 채움. 순서 = 점수대 → 태그 수 → 인기 랭킹 (C12-i)
+    """
+    checked = catalog.checked_games()
+    have = sum(1 for g in checked if passes_filter(g, profile))
+    need = CHECKED_MIN_CANDIDATES - have
+    if need <= 0:
+        return checked
+    return checked + unchecked_fill(catalog, profile)[:need]
+
+
+def unchecked_fill(catalog: Catalog, profile: UserProfile) -> list[dict]:
+    """미검수 게임 중 후보 거르기를 통과한 것, 채우는 순서대로: 점수대(FILL_SCORE_STEP 단위) → 태그 수 → 인기 랭킹 (C12-i)"""
+    from app.rankings import popular
+    position = {g["id"]: rank for rank, g in popular(catalog)}
+    extra = [g for g in catalog.games if not catalog.checked(g) and passes_filter(g, profile)]
+    extra.sort(key=lambda g: (-math.floor(score(g, profile) / FILL_SCORE_STEP), -len(game_features(g)),
+                              position.get(g["id"], 10_000)))
+    return extra
+
+
 def match_feed(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog, k: int,
                min_match: int = 0) -> tuple[list[dict], bool]:
     """
@@ -152,12 +196,23 @@ def match_feed(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog, k:
     def passes_home(game: dict) -> bool:  # 홈 슬라이드 기준 통과 칸 (C8-a: 태그 3개 이하 게임은 넣지 않음)
         return len(game_features(game)) >= HOME_MIN_TAGS and match_percent(game, profile) >= min_match
 
+    # C12-a: 태그 검수된 게임만 (랭킹·신작·검색·상세엔 미검수도 그대로). C12-i: 후보가 모자라면 미검수로 채움
+    games = recommendation_pool(catalog, profile)
+    pooled = {g["id"] for g in games}
+
+    def home_fill(have: set[str], n: int) -> list[dict]:
+        """홈 기준(취향 %·태그 수)을 넘는 게임이 모자랄 때 채울 미검수 게임 n개 (C12-i, 순서는 unchecked_fill)"""
+        if n <= 0:
+            return []
+        return [g for g in unchecked_fill(catalog, profile) if g["id"] not in have and passes_home(g)][:n]
+
     if user["exp_group"] == "random":
         # 후보 거르기(장르·비선호·이미 본 게임)만 하고 순서는 무작위. 탐색 슬롯 없음
-        candidates = [g for g in catalog.games if passes_filter(g, profile)]
+        candidates = [g for g in games if passes_filter(g, profile)]
         fallback = False
         if min_match > 0:
             passed = [g for g in candidates if passes_home(g)]
+            passed += home_fill(pooled, k - len(passed))  # C12-i: 기준 넘는 검수 게임이 k개보다 적으면 미검수로
             fallback = len(passed) < MIN_MATCH_FLOOR
             if not fallback:
                 candidates = passed
@@ -167,19 +222,28 @@ def match_feed(conn: sqlite3.Connection, user: sqlite3.Row, catalog: Catalog, k:
     def cards(items: list[dict]) -> list[dict]:
         return [card(catalog, r["game"], profile, slot=r["slot"], reasons=r["reasons"]) for r in items]
 
+    def checked_first(items: list[dict]) -> list[dict]:
+        """추천 칸은 검수된 게임 먼저, 채운 미검수 게임은 뒤로 (각각 점수 순 유지, C12-i). 탐색 칸은 그대로 뒤"""
+        main = [r for r in items if r["slot"] == "추천"]
+        main.sort(key=lambda r: not catalog.checked(r["game"]))
+        return main + [r for r in items if r["slot"] != "추천"]
+
     if min_match <= 0:
-        return cards(recommend(catalog.games, profile, k=k)), False
+        return cards(checked_first(recommend(games, profile, k=k))), False
 
     # 후보 전체를 점수 순으로 받아 기준 이상만 남기고, 탐색 슬롯(20%)은 남은 후보에서 엔진 규칙대로 다시 고른다
-    ranked = recommend(catalog.games, profile, k=len(catalog.games), explore_ratio=0)
+    ranked = recommend(games, profile, k=len(games), explore_ratio=0)
     n_explore = round(k * EXPLORE_RATIO)
     main = [r for r in ranked if passes_home(r["game"])][:k - n_explore]  # 순서는 score 그대로
+    # C12-i: 기준을 넘는 검수 게임이 칸보다 적으면 기준을 넘는 미검수 게임으로 채움 (검수 게임 먼저, 그다음 채운 것)
+    main += [{"game": g, "slot": "추천", "reasons": reasons(g, profile), "score": score(g, profile)}
+             for g in home_fill(pooled, k - n_explore - len(main))]
     if len(main) < MIN_MATCH_FLOOR:
-        return cards(recommend(catalog.games, profile, k=k)), True
+        return cards(checked_first(recommend(games, profile, k=k))), True
     chosen = {r["game"]["id"] for r in main}
-    rest = [g for g in catalog.games if g["id"] not in chosen]
+    rest = [g for g in games if g["id"] not in chosen]
     explore = recommend(rest, profile, k=n_explore, explore_ratio=1.0) if n_explore else []
-    return cards(main + explore), False
+    return cards(checked_first(main) + explore), False
 
 
 # ---------- 취향 요약 ----------

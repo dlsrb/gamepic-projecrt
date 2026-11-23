@@ -139,7 +139,7 @@ async function search(text) {
   renderKeywords(data.keywords);
   results.replaceChildren(
     el("p", { class: "search-count" }, `게임 ${data.games.length}개`),
-    gameGrid(data.games, { maxTags: 2, empty: "모든 키워드에 맞는 게임이 없어요. 키워드를 줄여 보세요" }));
+    gameGrid(data.games, { maxTags: 2, empty: "모든 키워드에 맞는 게임이 없어요" }));
 }
 
 function submit(event) {

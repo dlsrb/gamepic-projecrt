@@ -1,8 +1,8 @@
 // 게임 상세 (4.4 ④, 4.4.1 와이어프레임 05·06)
-// 상단바(← / 👍추천·홈) → 게임 카드(누르면 스토어, 아래 부합도) + 이름·순위·키워드 4개 → 영상 → 게임 소개
+// 상단바(← 로고 / 추천 버튼) → 게임 카드(누르면 스토어, 아래 부합도) + 이름·순위·키워드 4개 → 영상 → 게임 소개
 // → 별점·리뷰 → 댓글(C8-c) → 비슷한 게임 → 리뷰 데이터 분석(맨 아래) / 하단 메뉴(강조 없음)
 import {
-  api, bottomNav, el, emptyState, gameGrid, matchBadge, pages, tagChip, textOr, thumbnail, toast, topBar,
+  api, badgeRow, bottomNav, el, emptyState, gameGrid, lineIcon, matchBadge, pages, tagChip, textOr, thumbnail, toast, topBar,
 } from "/static/js/common.js";
 import { missingStoreMessage, storeTarget, storeUrl } from "/static/js/store.js";
 
@@ -18,11 +18,11 @@ function section(title, ...children) {
   return el("section", { class: "section" }, el("h2", { class: "section__title" }, title), ...children);
 }
 
-// ---------- 👍 추천 ----------
+// ---------- 추천 (따봉) ----------
 function likeButton(game) {
   const button = el("button", { type: "button", class: "icon-btn" });
   const render = () => {
-    button.textContent = `👍 추천 ${game.like_count}`;
+    button.replaceChildren(lineIcon("thumb"), `추천 ${game.like_count}`);  // C12-f: 이모지 대신 선 아이콘
     button.classList.toggle("is-active", game.liked);
     button.setAttribute("aria-pressed", String(game.liked));
     button.setAttribute("aria-label", game.liked ? `추천 취소 (지금 ${game.like_count})` : `추천하기 (지금 ${game.like_count})`);
@@ -86,12 +86,12 @@ function head(game) {
       el("h1", { class: "detail-name" }, game.name),
       el("span", { class: "chip detail-rank" }, game.rank ? `추천 순위 ${game.rank}위` : "순위 없음"),
       el("div", { class: "chips" }, keywords.map((k) => tagChip(k))),
-      game.indie ? el("span", { class: "chip" }, "인디") : null,
+      badgeRow(game.badges, { max: 4 }),  // 자동 배지 신작·인기·급상승·인디 (C12-e, 예전 "인디" 칩 대신)
       game.reasons.length ? el("p", { class: "detail-reasons" }, `내 취향과 맞는 점: ${game.reasons.join(", ")}`) : null));
 }
 
 function videoSection(game) {
-  if (!game.video_url) return section("영상", emptyState("영상 준비 중", "🎬"));
+  if (!game.video_url) return section("영상", emptyState("영상 준비 중"));
   return section("영상", el("a", { class: "btn btn--ghost btn--block", href: game.video_url, target: "_blank", rel: "noopener" }, "▶ 영상 보기"));
 }
 
@@ -130,7 +130,7 @@ function ratingSection(game, reviews) {
         el("span", {}, `${star}점`), el("span", { class: "bar" }, fill), el("span", { class: "star-bars__n" }, `${byStar[star] || 0}`));
     })));
   }
-  if (!parts.length) return section("별점", emptyState("별점 정보 준비 중", "⭐"));
+  if (!parts.length) return section("별점", emptyState("별점 정보 준비 중"));
   return section("별점", el("div", { class: "card" }, parts));
 }
 
@@ -193,14 +193,14 @@ function commentEditor({ value = "", submitLabel, onSubmit, onCancel = null }) {
   return { form, input };
 }
 
-/** 댓글 👍 추천 / 👎 비추천 (C9). 누르면 숫자를 바로 바꾸고 서버 응답으로 맞춤, 실패하면 되돌림 */
+/** 댓글 추천 / 비추천 (C9). 누르면 숫자를 바로 바꾸고 서버 응답으로 맞춤, 실패하면 되돌림 */
 function voteButtons(c) {
   const state = { likes: c.likes, dislikes: c.dislikes, my_vote: c.my_vote };
   const up = el("button", { type: "button", class: "vote-btn" });
   const down = el("button", { type: "button", class: "vote-btn" });
   const render = () => {
-    up.textContent = `👍 ${state.likes}`;
-    down.textContent = `👎 ${state.dislikes}`;
+    up.replaceChildren(lineIcon("thumb", { size: 14 }), `${state.likes}`);
+    down.replaceChildren(lineIcon("thumbDown", { size: 14 }), `${state.dislikes}`);
     up.setAttribute("aria-pressed", String(state.my_vote === 1));
     down.setAttribute("aria-pressed", String(state.my_vote === -1));
     up.setAttribute("aria-label", `추천 ${state.likes}`);
@@ -263,7 +263,7 @@ function saveSort(value) {
 function commentsSection(game) {
   const title = el("h2", { class: "section__title comment-title", tabindex: "-1" }, "댓글");
   const list = el("ul", { class: "comment-list" });
-  const empty = el("p", { class: "placeholder-text comment-empty" }, "첫 댓글을 남겨 보세요");
+  const empty = el("p", { class: "placeholder-text comment-empty" }, "아직 댓글이 없어요");
   const more = el("button", { type: "button", class: "btn btn--ghost btn--block btn--small", hidden: true }, "댓글 더 보기");
   const expand = el("button", { type: "button", class: "btn btn--ghost btn--block btn--small", hidden: true });
   const collapse = el("button", { type: "button", class: "btn btn--ghost btn--block btn--small", hidden: true }, "접기");
@@ -406,7 +406,7 @@ function sentimentBar(row) {
 }
 
 function analysisSection(reviews) {
-  if (!reviews.ready) return section("리뷰 데이터 분석", emptyState("리뷰 분석 준비 중", "📊"));
+  if (!reviews.ready) return section("리뷰 데이터 분석", emptyState("리뷰 분석 준비 중"));
   const legend = el("div", { class: "chips stack-legend" }, SENTIMENTS.map((s) =>
     el("span", { class: "chip" }, el("span", { class: `dot dot--${s.key}`, "aria-hidden": "true" }), s.label)));
   const stars = el("div", { class: "sentiment-rows" }, [...reviews.stars].sort((a, b) => b.star - a.star).map((row) =>
@@ -446,7 +446,7 @@ async function start() {
     );
   } catch (error) {
     app.append(topBar({ left: "back" }),
-      emptyState(error.status === 404 || error.status === 422 ? "게임을 찾을 수 없어요" : error.message, "🔍"));
+      emptyState(error.status === 404 || error.status === 422 ? "게임을 찾을 수 없어요" : error.message));
   }
   bottomNav();
 }

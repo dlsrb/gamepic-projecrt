@@ -220,7 +220,7 @@ def ensure_schema(db_path: Path | None = None) -> None:
 
     with get_connection(db_path or config.DB_PATH) as conn:
         conn.executescript(init_db.SCHEMA)
-        init_db.add_missing_columns(conn)
+        init_db.add_missing_columns(conn)  # tag_source 채우기(C12-j)도 여기서
         init_db.migrate_games_tier(conn)
 
 

@@ -4,11 +4,13 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app import rankings
 from app.db import get_db
+from app.reco import reco_config
 from app.deps import get_user
-from app.services import Catalog, card, first_sentence, match_feed, profile_for, ranking
+from app.services import Catalog, card, first_sentence, match_feed, profile_for, ranking, tag_names
 
 router = APIRouter(prefix="/api", tags=["홈"])
 
@@ -84,7 +86,8 @@ def new_games(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)
     tags = conn.execute("SELECT category, name FROM tags ORDER BY id").fetchall()
     return {
         "years": [today.year, today.year - 1],
-        "games": [card(catalog, g, profile, release_date=catalog.rows[g["id"]]["release_date"]) for g in released],
+        "games": [card(catalog, g, profile, release_date=catalog.rows[g["id"]]["release_date"],
+                       keywords=tag_names(g)[1:]) for g in released],  # keywords = 필터용 전체 태그 (C12-a)
         "filters": {
             "genre": [t["name"] for t in tags if t["category"] == "genre" and t["name"] in used],
             "keyword": {c: [t["name"] for t in tags if t["category"] == c and t["name"] in used] for c in KEYWORD_CATEGORIES},
@@ -109,3 +112,35 @@ def get_ranking(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_d
                              rank=item["rank"], like_count=item["like_count"],
                              summary=first_sentence(catalog.rows[item["game_id"]]["description"]))
                         for item in ranking(conn, catalog)[:RANKING_SIZE]]}
+
+
+# ---------- 인기 랭킹 탭 · 이달의 게임 (C12-c·d) ----------
+@router.get("/popular")
+def popular_ranking(tab: str = Query(rankings.ALL, max_length=20),
+                    limit: int = Query(reco_config.RANKING_SIZE, ge=1, le=reco_config.RANKING_SIZE),
+                    user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
+    """
+    인기 랭킹 (스토어 무료 차트). tab: all(두 스토어 중 높은 순위) | play | ios | 장르 탭(reco_config.RANKING_GENRE_TABS).
+    줄마다 rank(탭 안 순위)·summary·chart_rank_android/ios·badges. surge_collecting = 급상승 기록 쌓는 중
+    """
+    keys = [t["key"] for t in rankings.tabs()]
+    if tab not in keys:
+        raise HTTPException(422, f"tab은 {', '.join(keys)} 중 하나입니다.")
+    catalog = Catalog(conn)
+    profile = profile_for(conn, user, catalog)
+    games = []
+    for rank, game in rankings.popular(catalog, tab)[:limit]:
+        row = catalog.rows[game["id"]]
+        games.append(card(catalog, game, profile, rank=rank, summary=first_sentence(row["description"]),
+                          chart_rank_android=row["chart_rank_android"], chart_rank_ios=row["chart_rank_ios"]))
+    return {"tabs": rankings.tabs(), "tab": tab, "games": games, "surge_collecting": catalog.badges.collecting}
+
+
+@router.get("/monthly")
+def monthly_games(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
+    """이달의 게임 (홈): 이번 달 인기 + 급상승 위주, 취향 %는 약하게. 비선호(연관 태그 포함) 게임 제외. 설문 전에도 줌"""
+    catalog = Catalog(conn)
+    profile = profile_for(conn, user, catalog)
+    picked = rankings.monthly(catalog, profile)
+    return {"month": date.today().month,
+            "games": [card(catalog, p["game"], profile, month_rank=p["month_rank"]) for p in picked]}
