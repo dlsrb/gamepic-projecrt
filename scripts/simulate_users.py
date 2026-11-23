@@ -514,6 +514,29 @@ class Sim:
         }
 
 
+def monthly_likes_check(out: Path) -> dict:
+    """sim.db를 읽기 전용으로 열어 이달의 게임(설문 안 한 사람 기준)을 따봉 무게 0 / 지금 무게로 비교 (C15-c)"""
+    from unittest import mock
+
+    os.environ.setdefault("DB_PATH", str(out.resolve()))
+    sys.path.insert(0, str(BASE_DIR))
+    from app import rankings, services
+    from app.reco import reco_config
+    from app.reco.recommender import UserProfile
+
+    conn = sqlite3.connect(f"{out.resolve().as_uri()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        def names(weights):
+            with mock.patch.object(reco_config, "MONTHLY_WEIGHTS", weights):
+                return [p["game"]["name"] for p in rankings.monthly(services.Catalog(conn), UserProfile())]
+        without = dict(reco_config.MONTHLY_WEIGHTS, likes=0.0)
+        return {"weights": dict(reco_config.MONTHLY_WEIGHTS), "without_likes": names(without),
+                "with_likes": names(dict(reco_config.MONTHLY_WEIGHTS))}
+    finally:
+        conn.close()
+
+
 # ---------- 보고서 ----------
 def pct(x) -> str:
     return "-" if x is None else f"{x * 100:.1f}%"
@@ -582,7 +605,13 @@ def write_report(m: dict, path: Path) -> None:
         a = rk["after"]["likes_top10"][i] if i < len(rk["after"]["likes_top10"]) else None
         L.append(f"| {i + 1} | {f'{b[1]} ({b[2]})' if b else '-'} | {f'{a[1]} ({a[2]})' if a else '-'} |")
     L += ["", "**이달의 게임 (설문 안 한 사람 기준)**", "",
-          f"- 전: {', '.join(rk['before']['monthly']) or '-'}", f"- 후: {', '.join(rk['after']['monthly']) or '-'}", "",
+          f"- 전: {', '.join(rk['before']['monthly']) or '-'}", f"- 후: {', '.join(rk['after']['monthly']) or '-'}"]
+    check = m.get("monthly_likes_check")
+    if check:  # C15-c (--report-only로 sim.db에서 다시 계산, 시뮬은 다시 안 돌림)
+        L += [f"- C15-c 이번 달 따봉 반영 뒤 (sim.db, 무게 {check['weights']}): 따봉 무게 0이면 "
+              f"{', '.join(check['without_likes'])} → 따봉 반영 {', '.join(check['with_likes'])}"
+              + (" (달라짐)" if check["without_likes"] != check["with_likes"] else " (같음)")]
+    L += ["",
           "## 6. 검색", "",
           f"- 검색 {m['search']['total']}회 (" + ", ".join(f"{k} {n}" for k, n in m["search"]["by_kind"].items()) +
           ") — word = 유형에 맞는 단어, name = 게임 이름 일부, badge = 인디·신작·급상승·인기",
@@ -615,7 +644,11 @@ def write_report(m: dict, path: Path) -> None:
 def main(argv=None):
     args = parse_args(argv)
     if args.report_only:
-        write_report(json.loads(args.metrics.read_text(encoding="utf-8")), args.report)
+        metrics = json.loads(args.metrics.read_text(encoding="utf-8"))
+        if args.out.exists():  # C15-c: 따봉을 넣은 이달의 게임이 sim.db에서 달라지는지 (시뮬은 다시 안 돌림)
+            metrics["monthly_likes_check"] = monthly_likes_check(args.out)
+            args.metrics.write_text(json.dumps(metrics, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_report(metrics, args.report)
         print(f"보고서만 다시 씀 → {args.report}")
         return
     rerun_with_hash_seed(args.seed)

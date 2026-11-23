@@ -138,7 +138,8 @@ def popular_ranking(tab: str = Query(rankings.ALL, max_length=20),
         games.append(card(catalog, game, profile, rank=rank, charted=rank is not None,
                           summary=first_sentence(row["description"]),
                           chart_rank_android=row["chart_rank_android"], chart_rank_ios=row["chart_rank_ios"]))
-    return {"tabs": rankings.tabs(), "tab": tab, "games": games, "surge_collecting": catalog.badges.collecting}
+    return {"tabs": rankings.tabs(), "tab": tab, "games": games, "surge_collecting": catalog.badges.collecting,
+            "surge_notice": rankings.surge_notice(catalog.badges)}  # C15-a: 급상승 기록 부족 안내 (충분하면 null)
 
 
 @router.get("/monthly")

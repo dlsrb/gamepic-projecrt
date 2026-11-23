@@ -137,9 +137,16 @@ async function search(text) {
   suggestBox.hidden = true;
   const data = await api(`/api/search?q=${encodeURIComponent(q)}`);
   renderKeywords(data.keywords);
-  results.replaceChildren(
-    el("p", { class: "search-count" }, `게임 ${data.games.length}개`),
-    gameGrid(data.games, { maxTags: 2, empty: "모든 키워드에 맞는 게임이 없어요" }));
+  // C15-b: 모두 맞는 게임이 없으면 일부만 맞는 게임 + 카드마다 "○○만 맞음"
+  const games = data.partial
+    ? data.games.map((g) => ({ ...g, note: `${(g.matched_words || []).join("·")}만 맞음` }))
+    : data.games;
+  results.replaceChildren(...[
+    data.notice ? el("p", { class: "search-notice" }, data.notice) : null,          // C15-a: 급상승 기록 부족 안내
+    data.partial ? el("p", { class: "search-notice" }, "모두 맞는 게임이 없어 일부만 맞는 게임을 보여 드려요") : null,
+    el("p", { class: "search-count" }, `게임 ${games.length}개`),
+    gameGrid(games, { maxTags: 2, empty: "맞는 게임이 없어요" }),
+  ].filter(Boolean));
 }
 
 function submit(event) {

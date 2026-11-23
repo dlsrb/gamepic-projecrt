@@ -88,13 +88,20 @@ def search_games(conn: sqlite3.Connection, query: str, limit: int = 10) -> dict:
         return {"error": f"검색어는 {WORDS_MAX}단어, 단어마다 {WORD_MAX}자까지예요."}
     catalog = services.Catalog(conn)
     profile = UserProfile()  # 사용자 없음 → 비선호 거르기 없음, 취향 % 없음
-    terms, hits = search_catalog(catalog, profile, words, [])
-    return {
+    terms, hits, info = search_catalog(catalog, profile, words, [])
+    result = {
         "query": " ".join(words),
         "interpreted_as": [{"word": t["word"], "kind": t["kind"], "meaning": t["label"]} for t in terms],
         "total": len(hits),
-        "games": [game_brief(catalog, h["game"], name_exact=h["exact"]) for h in hits[:_limit(limit)]],
+        # partial: 모든 단어가 맞는 게임이 없어 일부만 맞는 게임 (matched_words·missed_words로 어떤 단어가 맞았는지)
+        "partial": info["partial"],
+        "games": [game_brief(catalog, h["game"], name_exact=h["exact"],
+                             **({"matched_words": h["matched"], "missed_words": h["missed"]} if info["partial"] else {}))
+                  for h in hits[:_limit(limit)]],
     }
+    if info["notice"]:
+        result["note"] = info["notice"]   # 예: 급상승 기록이 모자라 인기 게임으로 대신 (C15-a)
+    return result
 
 
 # ---------- 2. 상세 ----------
@@ -197,8 +204,9 @@ def get_rankings(conn: sqlite3.Connection, kind: str = "popular", tab: str = "�
         return {"kind": KINDS[kind], "games": [game_brief(catalog, p["game"], month_rank=p["month_rank"])
                                                for p in picked]}
     book = catalog.badges
-    if book.collecting:
-        return {"kind": KINDS[kind], "games": [],
-                "note": "급상승은 하루 1번 저장하는 기록이 7일 넘게 쌓여야 계산돼요. 지금은 기록 쌓는 중"}
+    if book.collecting:  # C15-a: 화면 검색과 같은 안내 + 인기 랭킹으로 대신
+        rows = rankings.popular(catalog, rankings.ALL)[:n]
+        return {"kind": KINDS[kind], "note": rankings.surge_notice(book, substitute=True), "substituted": "popular",
+                "games": [game_brief(catalog, g, rank=rank) for rank, g in rows]}
     top = sorted(book.surge.items(), key=lambda x: -x[1])[:n]
     return {"kind": KINDS[kind], "games": [game_brief(catalog, catalog.get(gid), surge_score=score) for gid, score in top]}

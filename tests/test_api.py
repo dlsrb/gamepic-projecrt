@@ -468,7 +468,10 @@ class SearchTest(ApiTestCase):
         self.assertEqual(set(self.search(q="쿠키런")), {"cookiekingdom", "cookierun"})  # 한 단어면 둘 다
 
     def test_words_are_and(self):
-        self.assertEqual(self.search(q="RPG 퍼즐"), [])                 # 장르가 둘 다인 게임 없음
+        # 장르가 둘 다인 게임 없음 → C15-b부터는 빈 화면 대신 "일부만 맞는 게임" (partial)
+        body = self.client.get("/api/search", params={"q": "RPG 퍼즐"}).json()
+        self.assertTrue(body["partial"])
+        self.assertTrue(all(len(g["matched_words"]) == 1 for g in body["games"]))
         self.assertEqual(self.search(q="2d"), self.search(q="2D"))       # 태그 이름은 대소문자 무시
         self.assertEqual(set(self.search(q="혼자 도트")), set(self.search(q="싱글 픽셀아트")))  # 동의어
 

@@ -263,6 +263,7 @@ export function gameCard(game, { maxTags = 2, showMatch = true } = {}) {
     badgeRow(game.badges),
     el("span", { class: "game-card__name" }, game.name),
     game.disliked ? el("span", { class: "game-card__note" }, "내 비선호 태그 포함") : null,  // 검색에서 이름으로 찾아 남은 비선호 게임 (C12-k)
+    game.note ? el("span", { class: "game-card__note" }, game.note) : null,  // 검색 일부 일치 "○○만 맞음" (C15-b)
     el("div", { class: "chips" }, (game.tags || []).slice(0, maxTags).map((t) => tagChip(t))),
     showMatch ? matchBadge(game.match, { short: true }) : null);
 }

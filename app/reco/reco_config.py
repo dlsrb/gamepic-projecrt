@@ -77,7 +77,9 @@ SURGE_TOP = 10                    # 점수 상위 이 수 안이면 배지
 # 이달의 게임 (홈): 이번 달 인기(스냅샷 평균 순위) + 급상승 위주, 취향 %는 약하게
 MONTHLY_SIZE = 5
 MONTHLY_POOL = 30                 # 이번 달 인기 상위 이 수 + 급상승 배지 게임이 후보
-MONTHLY_WEIGHTS = {"popular": 0.6, "surge": 0.3, "match": 0.1}
+# C15-c: 이번 달 게임픽 따봉 수를 약하게 더함 (전: popular 0.6 · surge 0.3 · match 0.1)
+MONTHLY_WEIGHTS = {"popular": 0.55, "surge": 0.25, "likes": 0.1, "match": 0.1}
+MONTHLY_LIKES_POOL = 10           # 이번 달 따봉 많은 게임 상위 이 수도 후보에 (차트 밖이어도 따봉으로 들어올 수 있게)
 MONTHLY_SKIP_POPULAR_TOP = 5      # 홈 바로 위 "인기 랭킹" 상위 5개와 겹치지 않게 그 게임은 뺌
 
 # 맞춤 추천 후보 채우기 (C12-i): 태그 검수된 게임 중 후보(비선호·이미 본 게임 거른 뒤)가 이보다 적으면

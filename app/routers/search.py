@@ -5,6 +5,7 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app import rankings
 from app.config import BASE_DIR
 from app.db import get_db
 from app.deps import get_user
@@ -98,31 +99,57 @@ def _name_rank(name: str, whole: str, needles: list[str]) -> int | None:
     return None
 
 
-def search_catalog(catalog: Catalog, profile, words: list[str], selected: list[str]) -> tuple[list[dict], list[dict]]:
+def search_catalog(catalog: Catalog, profile, words: list[str],
+                   selected: list[str]) -> tuple[list[dict], list[dict], dict]:
     """
-    검색 해석·거르기·정렬 (/api/search와 MCP search_games가 같이 씀, C13에서 라우터에서 떼어 냄 — 동작은 그대로).
-    반환 (terms, [{game, exact, disliked, match}]) 정렬된 순서. disliked = 비선호인데 이름 일치로 남은 게임
+    검색 해석·거르기·정렬 (/api/search와 MCP search_games가 같이 씀, C13에서 라우터에서 떼어 냄).
+    반환 (terms, [{game, exact, disliked, match, matched, missed}], info) 정렬된 순서.
+      disliked = 비선호인데 이름 일치로 남은 게임 / matched·missed = 맞은·안 맞은 검색 단어 (C15-b)
+      info = {"partial": 일부만 맞는 게임인지, "notice": 안내 문구 또는 None}
+    C15-a: 급상승 기록이 모자라면(7일 미만) "급상승"은 "인기"로 바꿔 찾고 안내 문구를 붙임
+    C15-b: 모두 맞는 게임(AND)이 0개이고 단어가 2개 이상이면 → 하나 이상 맞는 게임을 맞은 단어 수 → 취향 % 순으로 (partial)
+    비선호 제외는 두 경우 모두 같음: 태그·동의어·배지로 찾은 결과에서만 빼고, 이름 일부가 맞은 게임은 남김 (C12-k)
     """
     all_tags = {t for g in catalog.games for t in tag_names(g)}
     terms = interpret(words, all_tags) + interpret(selected, all_tags)
+    book = catalog.badges
+    info = {"partial": False, "notice": None}
+    if book.collecting and any(t["kind"] == "badge" and t["include"] == ["급상승"] for t in terms):
+        for t in terms:
+            if t["kind"] == "badge" and t["include"] == ["급상승"]:
+                t.update(include=["인기"], label="인기 (급상승 대신)")
+        info["notice"] = rankings.surge_notice(book, substitute=True)
     exact = _normalize(" ".join(words))
     searched = {n for t in terms if t["kind"] == "tag" for n in t["include"]}
     searched |= {label_of(f) for t in terms if t["kind"] == "synonym" for f in t["include"]}
     excluded = {f for f in profile.excluded if label_of(f) not in searched}
     needles = [n for n in (_normalize(t["word"]) for t in terms if t["kind"] == "text") if n]
-    hits = []
-    for game in catalog.games:
-        if not _matches(game, terms, catalog.badges):
-            continue
-        name_rank = _name_rank(_normalize(game["name"]), exact, needles)
-        disliked = bool(set(game_features(game)) & profile.excluded)
-        if name_rank is None and set(game_features(game)) & excluded:
-            continue  # 태그·동의어·배지로만 찾은 비선호 게임은 뺌
-        hits.append({"game": game, "rank": name_rank if name_rank is not None else NAME_NONE,
-                     "exact": name_rank == NAME_EXACT, "disliked": disliked and name_rank is not None,
-                     "match": match_percent(game, profile)})
-    hits.sort(key=lambda h: (h["rank"], -h["match"]))
-    return terms, hits
+
+    def collect(require_all: bool) -> list[dict]:
+        hits = []
+        for game in catalog.games:
+            matched = [t for t in terms if _matches(game, [t], book)]
+            if not matched or (require_all and len(matched) < len(terms)):
+                continue
+            name_rank = _name_rank(_normalize(game["name"]), exact, needles)
+            disliked = bool(set(game_features(game)) & profile.excluded)
+            if name_rank is None and set(game_features(game)) & excluded:
+                continue  # 태그·동의어·배지로만 찾은 비선호 게임은 뺌
+            hits.append({"game": game, "rank": name_rank if name_rank is not None else NAME_NONE,
+                         "exact": name_rank == NAME_EXACT, "disliked": disliked and name_rank is not None,
+                         "match": match_percent(game, profile),
+                         "matched": [t["word"] for t in matched],
+                         "missed": [t["word"] for t in terms if t not in matched]})
+        return hits
+
+    hits = collect(require_all=True)
+    if hits or len(terms) < 2:
+        hits.sort(key=lambda h: (h["rank"], -h["match"]))
+    else:
+        hits = collect(require_all=False)
+        hits.sort(key=lambda h: (-len(h["matched"]), -h["match"], h["rank"]))
+        info["partial"] = bool(hits)
+    return terms, hits, info
 
 
 @router.get("/search", dependencies=[Depends(rate_limit("search"))])
@@ -133,6 +160,8 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
        예: "무료 2D" = 유료구매가 아니면서 2D인 게임
     tags: 쉼표로 구분한 태그 이름 (모두 가진 게임만, 예전 방식도 그대로 받음)
     순서: 이름 정확히 일치 → 이름 앞부분 일치 → 이름 부분 일치 → 나머지, 각 묶음 안에서는 취향 부합도 높은 순 (C12-k).
+    모두 맞는 게임이 0개면(단어 2개 이상) 일부만 맞는 게임 → partial=true, 카드마다 matched_words (C15-b).
+    급상승 기록이 모자라면 "급상승"을 "인기"로 찾고 notice에 안내 (C15-a).
     비선호(+연관 태그, C11-e)가 붙은 게임은 뺀다. 단 검색어가 게임 이름에 들어 있으면(이름 부분 일치) 남기고
     카드에 disliked=true (C12-k), 직접 검색한 태그 때문에 걸리는 경우도 남김. 즉 비선호 제외는 태그·동의어·배지로 찾은 결과에만
     검색어는 search_logs에 남긴다 (사용자 ID 없이).
@@ -147,14 +176,17 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
 
     catalog = Catalog(conn)
     profile = profile_for(conn, user, catalog)
-    terms, hits = search_catalog(catalog, profile, words, selected)
-    found = [card(catalog, h["game"], profile, exact=h["exact"], **({"disliked": True} if h["disliked"] else {}))
+    terms, hits, info = search_catalog(catalog, profile, words, selected)
+    found = [card(catalog, h["game"], profile, exact=h["exact"], **({"disliked": True} if h["disliked"] else {}),
+                  **({"matched_words": h["matched"]} if info["partial"] else {}))
              for h in hits]
 
     if q:
         conn.execute("INSERT INTO search_logs (keyword) VALUES (?)", (q,))
     keywords = [{k: t[k] for k in ("word", "kind", "label")} for t in terms]
-    return {"q": q, "tags": selected, "keywords": keywords, "games": found[:RESULT_MAX]}
+    # partial = 모두 맞는 게임이 없어 일부만 맞는 게임 (C15-b), notice = 급상승 기록 부족 안내 등 (C15-a)
+    return {"q": q, "tags": selected, "keywords": keywords, "games": found[:RESULT_MAX],
+            "partial": info["partial"], "notice": info["notice"]}
 
 
 @router.get("/search/suggest", dependencies=[Depends(rate_limit("suggest"))])

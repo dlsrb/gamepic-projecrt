@@ -124,6 +124,8 @@
 .suggest-item__type { flex: none; font-size: 12px; color: var(--text-muted); }
 .search-keywords { margin-top: 12px; }
 .search-count { margin: 14px 0 8px; font-size: 14px; color: var(--text-muted); }
+.search-notice { margin: 12px 0 0; font-size: 14px; color: var(--text); }  /* 급상승 안내·일부만 맞음 안내 (C15) */
+.search-notice + .search-count { margin-top: 4px; }
 
 /* ---------- 설정 ---------- */
 .settings-title { margin-top: 4px; font-size: 20px; }

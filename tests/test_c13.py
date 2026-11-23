@@ -121,9 +121,9 @@ class McpToolsTest(ApiTestCase):
         self.assertIn("tabs", tools.get_rankings(self.ro, "popular", "없는탭"))
         self.assertIn("kinds", tools.get_rankings(self.ro, "nope"))
         self.assertIn("games", tools.get_rankings(self.ro, "monthly"))
-        surge = tools.get_rankings(self.ro, "surge")
-        self.assertEqual(surge["games"], [])
-        self.assertIn("기록 쌓는 중", surge["note"])
+        surge = tools.get_rankings(self.ro, "surge")          # C15-a부터: 기록 부족 안내 + 인기 랭킹으로 대신
+        self.assertEqual(surge["substituted"], "popular")
+        self.assertIn("급상승은 기록이 7일 쌓이면 보여요", surge["note"])
 
     def test_likes_ranking_and_no_personal_data(self):
         """추천 순위는 모아 센 수만. 사용자 id·닉네임·댓글 본문·반응 기록은 어떤 도구 결과에도 없음"""

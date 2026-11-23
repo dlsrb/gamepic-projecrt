@@ -107,6 +107,7 @@ class BadgeBook:
         self.conn = catalog.conn
         self.today = today or date.today()
         self.surge, self.collecting = surge_scores(self.conn, catalog, self.today)
+        self.record_days = record_days(self.conn, self.today)
         popular_ids = [g["id"] for _, g in popular(catalog, ALL)[:cfg.POPULAR_BADGE_TOP]]
         top_surge = sorted((gid for gid, s in self.surge.items() if s >= cfg.SURGE_MIN_SCORE),
                            key=lambda gid: -self.surge[gid])[:cfg.SURGE_TOP]
@@ -136,6 +137,22 @@ def is_indie(row) -> bool:
     if row["installs"] is not None:
         return row["installs"] <= cfg.INDIE_MAX_INSTALLS
     return row["is_indie"] == 1
+
+
+def record_days(conn: sqlite3.Connection, today: date) -> int:
+    """급상승 기록이 쌓인 날 수 = 가장 오래된 스냅샷 날부터 오늘까지 (그날 포함). 스냅샷이 없으면 0"""
+    first = conn.execute("SELECT MIN(day) FROM game_stats_daily").fetchone()[0]
+    if not first:
+        return 0
+    return max(0, (today - date.fromisoformat(first)).days + 1)
+
+
+def surge_notice(book, substitute: bool = False) -> str | None:
+    """급상승 기록이 모자랄 때 안내 문구 (C15-a). 검색·랭킹 API·MCP가 같은 문구를 씀. 기록이 충분하면 None"""
+    if not book.collecting:
+        return None
+    text = f"급상승은 기록이 {cfg.SURGE_MIN_DAYS}일 쌓이면 보여요 (지금 {book.record_days}일)."
+    return f"{text} 대신 인기 게임을 보여 드려요" if substitute else text
 
 
 def surge_scores(conn: sqlite3.Connection, catalog, today: date) -> tuple[dict[str, float], bool]:
@@ -184,11 +201,22 @@ def surge_scores(conn: sqlite3.Connection, catalog, today: date) -> tuple[dict[s
 
 
 # ---------- 이달의 게임 ----------
+def month_likes(conn: sqlite3.Connection, today: date) -> dict[str, int]:
+    """이번 달(로컬 시간 1일 0시~) 게임별 따봉 수. created_at은 UTC라 로컬 1일 0시를 UTC로 바꿔 비교 (C15-c)"""
+    start = today.replace(day=1).isoformat() + " 00:00:00"
+    return {r[0]: r[1] for r in conn.execute(
+        "SELECT game_id, COUNT(*) FROM reactions WHERE type = 'like' AND created_at >= datetime(?, 'utc') "
+        "GROUP BY game_id", (start,))}
+
+
 def monthly(catalog, profile, today: date | None = None, size: int = cfg.MONTHLY_SIZE) -> list[dict]:
     """
-    [{game, score, month_rank}] 점수 높은 순. 후보 = 이번 달 인기 상위 MONTHLY_POOL + 급상승 배지 게임.
+    [{game, score, month_rank, month_likes}] 점수 높은 순.
+    후보 = 이번 달 인기 상위 MONTHLY_POOL + 급상승 배지 게임 + 이번 달 따봉 많은 게임 상위 MONTHLY_LIKES_POOL (C15-c).
     이번 달 인기 = 이번 달 스냅샷의 '두 스토어 중 높은 순위' 평균 (스냅샷이 없으면 지금 순위).
-    점수 = popular 무게 × (1 − (이번 달 순위 − 1) ÷ POOL) + surge 무게 × 급상승 점수 + match 무게 × 취향 %/100.
+    점수 = popular 무게 × (1 − (이번 달 순위 − 1) ÷ POOL) + surge 무게 × 급상승 점수
+         + likes 무게 × (이번 달 따봉 수 ÷ 이번 달 게임별 따봉 최댓값) + match 무게 × 취향 %/100.
+    이번 달 따봉 = 이 DB의 reactions(type='like') 중 로컬 시간 이번 달 1일 0시 이후 (따봉 취소하면 빠짐)
     비선호(연관 태그 포함, profile.excluded)가 붙은 게임은 뺌. 설문 전이면 비선호 없음·취향 0.
     홈 바로 위 인기 랭킹 상위 MONTHLY_SKIP_POPULAR_TOP개도 뺌 (같은 게임이 두 번 보이지 않게)
     """
@@ -208,8 +236,11 @@ def monthly(catalog, profile, today: date | None = None, size: int = cfg.MONTHLY
             month_rank[game["id"]] = value
     ordered = sorted(month_rank, key=lambda gid: month_rank[gid])
     position = {gid: i for i, gid in enumerate(ordered, 1)}
+    likes = month_likes(conn, today)
+    top_likes = max(likes.values(), default=0)
+    liked_ids = sorted(likes, key=lambda gid: (-likes[gid], gid))[:cfg.MONTHLY_LIKES_POOL]
     shown_above = {g["id"] for _, g in popular(catalog, ALL)[:cfg.MONTHLY_SKIP_POPULAR_TOP]}  # 홈 인기 랭킹과 안 겹치게
-    pool = (set(ordered[:cfg.MONTHLY_POOL]) | book.sets["급상승"]) - shown_above
+    pool = (set(ordered[:cfg.MONTHLY_POOL]) | book.sets["급상승"] | set(liked_ids)) - shown_above
     w = cfg.MONTHLY_WEIGHTS
     picked = []
     for gid in pool:
@@ -218,8 +249,9 @@ def monthly(catalog, profile, today: date | None = None, size: int = cfg.MONTHLY
             continue
         pos = position.get(gid)
         popular_part = max(0.0, 1 - (pos - 1) / cfg.MONTHLY_POOL) if pos else 0.0
+        like_part = likes.get(gid, 0) / top_likes if top_likes else 0.0
         score = (w["popular"] * popular_part + w["surge"] * book.surge.get(gid, 0.0)
-                 + w["match"] * match_percent(game, profile) / 100)
-        picked.append({"game": game, "score": round(score, 4), "month_rank": pos})
+                 + w.get("likes", 0.0) * like_part + w["match"] * match_percent(game, profile) / 100)
+        picked.append({"game": game, "score": round(score, 4), "month_rank": pos, "month_likes": likes.get(gid, 0)})
     picked.sort(key=lambda x: (-x["score"], x["month_rank"] or NO_RANK))
     return picked[:size]
