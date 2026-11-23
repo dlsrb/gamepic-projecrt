@@ -188,7 +188,8 @@ class DislikeRelatedTest(ApiTestCase):
     def test_search_excludes_but_keeps_exact_and_searched_tag(self):
         self.cute_rpg_user()
         names = lambda **p: [g["id"] for g in self.client.get("/api/search", params=p).json()["games"]]  # noqa: E731
-        self.assertEqual(names(q="쿠키런"), [])                                   # 둘 다 빠짐 (캐주얼 / 귀여움)
+        # C12-k부터: 검색어가 이름에 들어 있으면 비선호여도 남김 (전에는 둘 다 빠졌음)
+        self.assertEqual(set(names(q="쿠키런")), {"cookierun", "cookiekingdom"})
         self.assertEqual(names(q="쿠키런: 오븐브레이크"), ["cookierun"])           # 이름을 정확히 치면 남김
         cute = names(tags="귀여움")                                               # 귀여움을 직접 찾으면
         self.assertIn("maplem", cute)                                            # 귀여움 때문에 빠지던 건 보임

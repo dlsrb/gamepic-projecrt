@@ -29,8 +29,13 @@ def best_rank(row) -> int | None:
     return min(ranks) if ranks else None
 
 
-def popular(catalog, tab: str = ALL) -> list[tuple[int, dict]]:
-    """[(순위, 게임)] 순위는 1부터. tab: all | play | ios | 장르 이름 (장르 탭은 전체 순서 그대로 그 장르만)"""
+def popular(catalog, tab: str = ALL, fill: bool = False) -> list[tuple[int | None, dict]]:
+    """
+    [(순위, 게임)] 순위는 1부터. tab: all | play | ios | 장르 이름 (장르 탭은 전체 순서 그대로 그 장르만).
+    fill=True (랭킹 화면용, C12-k): 차트 순위 게임이 RANKING_MIN_ROWS개보다 적으면 차트 밖 게임을 이어서 채움 → 순위 None.
+      차트 밖 후보: 장르 탭 = 그 장르 게임, Google Play 탭 = Play 링크 있는 게임, App Store 탭 = App Store 링크 있는 게임.
+      순서는 offchart_order (설치 수·별점 수·따봉 수). 홈 인기 랭킹·"인기" 배지·이달의 게임은 fill 없이 차트 순위만
+    """
     order = {g["id"]: i for i, g in enumerate(catalog.games)}
 
     def key(game):
@@ -48,7 +53,31 @@ def popular(catalog, tab: str = ALL) -> list[tuple[int, dict]]:
     pool = catalog.games if tab in (ALL, PLAY, IOS) else [g for g in catalog.games if g["genre"] == tab]
     keyed = [(key(g), g) for g in pool]
     ranked = sorted(((k, g) for k, g in keyed if k), key=lambda x: (x[0], order[x[1]["id"]]))
-    return [(i, g) for i, (_, g) in enumerate(ranked, 1)]
+    result: list[tuple[int | None, dict]] = [(i, g) for i, (_, g) in enumerate(ranked, 1)]
+    if fill and len(result) < cfg.RANKING_MIN_ROWS:
+        link = {PLAY: "android_url", IOS: "ios_url"}.get(tab)
+        rest = [g for k, g in keyed if not k and (link is None or catalog.rows[g["id"]][link])]
+        result += [(None, g) for g in offchart_order(catalog, rest)[:cfg.RANKING_MIN_ROWS - len(result)]]
+    return result
+
+
+def offchart_order(catalog, games: list[dict]) -> list[dict]:
+    """차트 밖 게임 순서 (C12-k): Σ 무게 × log10(값+1) ÷ log10(최댓값+1), 값 = 설치 수·별점 수·게임픽 따봉 수"""
+    import math
+
+    likes = {r["game_id"]: r["n"] for r in catalog.conn.execute(
+        "SELECT game_id, COUNT(*) AS n FROM reactions WHERE type = 'like' GROUP BY game_id")}
+    values = {g["id"]: {"installs": catalog.rows[g["id"]]["installs"] or 0,
+                        "ratings": catalog.rows[g["id"]]["store_rating_count"] or 0,
+                        "likes": likes.get(g["id"], 0)} for g in games}
+    top = {k: max((v[k] for v in values.values()), default=0) for k in cfg.OFFCHART_WEIGHTS}
+
+    def scaled(value, k):
+        return math.log10(value + 1) / math.log10(top[k] + 1) if top[k] > 0 else 0.0
+
+    order = {g["id"]: i for i, g in enumerate(catalog.games)}
+    score = {gid: sum(w * scaled(v[k], k) for k, w in cfg.OFFCHART_WEIGHTS.items()) for gid, v in values.items()}
+    return sorted(games, key=lambda g: (-score[g["id"]], order[g["id"]]))
 
 
 # ---------- 스냅샷 ----------

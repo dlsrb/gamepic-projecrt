@@ -83,6 +83,21 @@ def _matches(game: dict, terms: list[dict], badges=None) -> bool:
     return True
 
 
+NAME_EXACT, NAME_PREFIX, NAME_PART, NAME_NONE = 0, 1, 2, 3
+
+
+def _name_rank(name: str, whole: str, needles: list[str]) -> int | None:
+    """검색어와 게임 이름(둘 다 _normalize)의 관계: 정확히 0 · 앞부분 1 · 부분 2 · 이름과 무관 None (C12-k)"""
+    if whole and name == whole:
+        return NAME_EXACT
+    words = [w for w in [whole, *needles] if w]
+    if any(name.startswith(w) for w in words):
+        return NAME_PREFIX
+    if any(w in name for w in words):
+        return NAME_PART
+    return None
+
+
 @router.get("/search", dependencies=[Depends(rate_limit("search"))])
 def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_length=TAGS_PARAM_MAX),
            user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
@@ -90,8 +105,9 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
     q: 띄어쓰기로 나눈 단어마다 태그 / 동의어(data/search_synonyms.json) / 이름·태그 부분 일치로 해석, 모두 만족(AND)
        예: "무료 2D" = 유료구매가 아니면서 2D인 게임
     tags: 쉼표로 구분한 태그 이름 (모두 가진 게임만, 예전 방식도 그대로 받음)
-    검색어 전체가 게임 이름과 같으면 그 게임이 맨 앞, 나머지는 취향 부합도 높은 순.
-    비선호(+연관 태그, C11-e)가 붙은 게임은 뺀다. 단 이름을 정확히 친 게임, 직접 검색한 태그 때문에 걸리는 경우는 남김
+    순서: 이름 정확히 일치 → 이름 앞부분 일치 → 이름 부분 일치 → 나머지, 각 묶음 안에서는 취향 부합도 높은 순 (C12-k).
+    비선호(+연관 태그, C11-e)가 붙은 게임은 뺀다. 단 검색어가 게임 이름에 들어 있으면(이름 부분 일치) 남기고
+    카드에 disliked=true (C12-k), 직접 검색한 태그 때문에 걸리는 경우도 남김. 즉 비선호 제외는 태그·동의어·배지로 찾은 결과에만
     검색어는 search_logs에 남긴다 (사용자 ID 없이).
     """
     words = q.split()
@@ -110,15 +126,21 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
     searched = {n for t in terms if t["kind"] == "tag" for n in t["include"]}
     searched |= {label_of(f) for t in terms if t["kind"] == "synonym" for f in t["include"]}
     excluded = {f for f in profile.excluded if label_of(f) not in searched}
+    needles = [n for n in (_normalize(t["word"]) for t in terms if t["kind"] == "text") if n]
     found = []
     for game in catalog.games:
         if not _matches(game, terms, catalog.badges):
             continue
-        is_exact = bool(exact) and _normalize(game["name"]) == exact
-        if not is_exact and set(game_features(game)) & excluded:
-            continue
-        found.append(card(catalog, game, profile, exact=is_exact))
-    found.sort(key=lambda c: (not c["exact"], -c["match"]))
+        name = _normalize(game["name"])
+        name_rank = _name_rank(name, exact, needles)
+        disliked = bool(set(game_features(game)) & profile.excluded)
+        if name_rank is None and set(game_features(game)) & excluded:
+            continue  # 태그·동의어·배지로만 찾은 비선호 게임은 뺌
+        extra = {"disliked": True} if disliked and name_rank is not None else {}
+        found.append((name_rank if name_rank is not None else NAME_NONE,
+                      card(catalog, game, profile, exact=name_rank == NAME_EXACT, **extra)))
+    found.sort(key=lambda x: (x[0], -x[1]["match"]))
+    found = [c for _, c in found]
 
     if q:
         conn.execute("INSERT INTO search_logs (keyword) VALUES (?)", (q,))
@@ -128,13 +150,18 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
 
 @router.get("/search/suggest", dependencies=[Depends(rate_limit("suggest"))])
 def suggest(q: str = Query(..., min_length=1, max_length=QUERY_MAX), conn: sqlite3.Connection = Depends(get_db)):
-    """자동완성: 게임 이름·태그 이름 앞부분 일치, 최대 8개 (게임 먼저)"""
+    """
+    자동완성 (C12-k: 검색과 같은 이름 규칙): 게임 이름은 띄어쓰기·기호·대소문자 무시하고 앞부분 일치 먼저 → 부분 일치,
+    그다음 태그 이름 앞부분 일치, 최대 8개 (게임 먼저). 비선호로 거르지 않음 (이름으로 찾는 것이라 검색과 같음)
+    """
     prefix = " ".join(q.split()).lower()
-    if not prefix:
+    needle = _normalize(q)
+    if not prefix or not needle:
         return {"suggestions": []}
+    games = [(_normalize(row["name"]), row) for row in
+             conn.execute("SELECT id, name FROM games WHERE review_status = 'ok' ORDER BY rowid")]
     items = [{"type": "game", "text": row["name"], "id": row["id"]}
-             for row in conn.execute("SELECT id, name FROM games WHERE review_status = 'ok' ORDER BY rowid")
-             if row["name"].lower().startswith(prefix)]
+             for name, row in sorted(((n, r) for n, r in games if needle in n), key=lambda x: not x[0].startswith(needle))]
     items += [{"type": "tag", "text": row["name"], "category": row["category"]}
               for row in conn.execute("SELECT DISTINCT name, category FROM tags ORDER BY id")
               if row["name"].lower().startswith(prefix)]

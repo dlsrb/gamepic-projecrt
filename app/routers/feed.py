@@ -118,10 +118,13 @@ def get_ranking(user=Depends(get_user), conn: sqlite3.Connection = Depends(get_d
 @router.get("/popular")
 def popular_ranking(tab: str = Query(rankings.ALL, max_length=20),
                     limit: int = Query(reco_config.RANKING_SIZE, ge=1, le=reco_config.RANKING_SIZE),
+                    fill: bool = Query(True),
                     user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
     """
     인기 랭킹 (스토어 무료 차트). tab: all(두 스토어 중 높은 순위) | play | ios | 장르 탭(reco_config.RANKING_GENRE_TABS).
-    줄마다 rank(탭 안 순위)·summary·chart_rank_android/ios·badges. surge_collecting = 급상승 기록 쌓는 중
+    줄마다 rank(탭 안 순위)·summary·chart_rank_android/ios·badges. surge_collecting = 급상승 기록 쌓는 중.
+    차트 순위 게임이 RANKING_MIN_ROWS(20)개보다 적은 탭은 차트 밖 게임을 이어서 채움 → rank null, charted false (C12-k).
+    fill=false면 차트 순위 게임만 (홈 인기 랭킹 5개)
     """
     keys = [t["key"] for t in rankings.tabs()]
     if tab not in keys:
@@ -129,9 +132,11 @@ def popular_ranking(tab: str = Query(rankings.ALL, max_length=20),
     catalog = Catalog(conn)
     profile = profile_for(conn, user, catalog)
     games = []
-    for rank, game in rankings.popular(catalog, tab)[:limit]:
+    # 비선호로 거르지 않음 (랭킹은 스토어 순위 그대로, C12-k에서 테스트로 고정)
+    for rank, game in rankings.popular(catalog, tab, fill=fill)[:limit]:
         row = catalog.rows[game["id"]]
-        games.append(card(catalog, game, profile, rank=rank, summary=first_sentence(row["description"]),
+        games.append(card(catalog, game, profile, rank=rank, charted=rank is not None,
+                          summary=first_sentence(row["description"]),
                           chart_rank_android=row["chart_rank_android"], chart_rank_ios=row["chart_rank_ios"]))
     return {"tabs": rankings.tabs(), "tab": tab, "games": games, "surge_collecting": catalog.badges.collecting}
 

@@ -32,7 +32,7 @@ const loading = () => el("p", { class: "placeholder-text" }, "불러오는 중�
 // ---------- 인기 랭킹 상위 5개 (스토어 차트, C12-b·c) ----------
 function popularSection() {
   const box = el("div", {}, loading());
-  api("/api/popular?tab=all&limit=5", { silent: true })
+  api("/api/popular?tab=all&limit=5&fill=false", { silent: true })  // 홈은 차트 순위 게임만 (C12-k)
     .then(({ games }) => box.replaceChildren(rankList(games, { kind: "store" })))
     .catch(() => box.replaceChildren(emptyState("인기 랭킹을 불러오지 못했어요")));
   return sectionWithMore("인기 랭킹", pages.ranking(), box);

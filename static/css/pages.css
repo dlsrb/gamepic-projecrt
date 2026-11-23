@@ -271,3 +271,7 @@
 .survey-search__cat { margin-left: 4px; font-size: 12px; opacity: 0.75; }
 .survey-more { align-self: flex-start; min-height: 36px; padding: 4px 14px; font-size: 14px; }
 .survey-all { display: flex; flex-direction: column; gap: 8px; }
+
+/* 인기 랭킹 차트 밖 구분 줄 (C12-k) */
+.rank-list li.rank-divider { padding: 12px 0 4px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--line); }
+.rank-list li.rank-divider + li { border-top: 0; }

@@ -84,3 +84,9 @@ MONTHLY_SKIP_POPULAR_TOP = 5      # 홈 바로 위 "인기 랭킹" 상위 5개�
 # 미검수 게임으로 이 수까지 채운다. 채우는 순서 = 점수대(0.1 단위) 높은 순 → 태그 수 많은 순 → 인기 랭킹 높은 순
 CHECKED_MIN_CANDIDATES = 9
 FILL_SCORE_STEP = 0.1
+
+# 인기 랭킹 탭 채우기 (C12-k): 차트 순위 게임이 이보다 적은 탭(장르·스토어)은 차트 밖 게임을 이어서 채움
+RANKING_MIN_ROWS = 20
+# 차트 밖 순서 점수 = Σ 무게 × log10(값 + 1) ÷ log10(탭 안 최댓값 + 1)  (값: 설치 수, 별점 수, 게임픽 따봉 수)
+# 설치 수가 없는 iOS 전용 게임은 설치 수 몫이 0 → 별점 수·따봉으로만
+OFFCHART_WEIGHTS = {"installs": 0.5, "ratings": 0.4, "likes": 0.1}

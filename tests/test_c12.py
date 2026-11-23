@@ -158,12 +158,14 @@ class PopularTabsTest(C12Case):
     def test_tab_orders(self):
         body = self.tab("all")
         self.assertEqual([t["key"] for t in body["tabs"]], ["all", "play", "ios", *cfg.RANKING_GENRE_TABS])
+        # C12-k부터 차트 순위 게임이 20개 미만인 탭은 차트 밖 게임(rank None)을 이어 붙임 → 차트 순위 부분만 비교
+        charted = lambda games: [g["id"] for g in games if g["rank"] is not None]  # noqa: E731
         self.assertEqual(self.ids(body["games"])[:5], ["chrono", "ff6", "brawl", "dq8", "candy"])   # 높은 순위 → 다른 쪽 순위
         self.assertEqual([g["rank"] for g in body["games"]][:3], [1, 2, 3])
-        self.assertEqual(self.ids(self.tab("play")["games"]), ["chrono", "dq8", "brawl", "cookiekingdom", "epic7", "odin"])
-        self.assertEqual(self.ids(self.tab("ios")["games"]), ["ff6", "brawl", "chrono", "candy", "mushroom"])
-        rpg = self.tab("RPG")["games"]
-        all_rpg = [g for g in self.ids(body["games"]) if self.client.get(f"/api/games/{g}").json()["tags"]["genre"] == ["RPG"]]
+        self.assertEqual(charted(self.tab("play")["games"]), ["chrono", "dq8", "brawl", "cookiekingdom", "epic7", "odin"])
+        self.assertEqual(charted(self.tab("ios")["games"]), ["ff6", "brawl", "chrono", "candy", "mushroom"])
+        rpg = [g for g in self.tab("RPG")["games"] if g["rank"] is not None]
+        all_rpg = [g for g in charted(body["games"]) if self.client.get(f"/api/games/{g}").json()["tags"]["genre"] == ["RPG"]]
         self.assertEqual(self.ids(rpg), all_rpg)                                    # 전체 순서에서 RPG만
         self.assertEqual([g["rank"] for g in rpg], list(range(1, len(rpg) + 1)))
         first = body["games"][0]

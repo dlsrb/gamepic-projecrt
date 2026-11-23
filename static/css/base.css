@@ -403,3 +403,6 @@ button.chip { min-height: 36px; padding: 4px 14px; font-size: 14px; }
   background: none; color: var(--text-muted); font-size: 16px;
 }
 .segmented__item.is-selected { border-bottom-color: var(--accent-strong); color: var(--text); font-weight: 700; }
+
+/* 검색에서 이름으로 찾아 남은 비선호 게임 표시 (C12-k) */
+.game-card__note { font-size: 12px; color: var(--text-muted); }

@@ -262,6 +262,7 @@ export function gameCard(game, { maxTags = 2, showMatch = true } = {}) {
     el("div", { class: "game-card__thumb" }, thumbnail(game)),
     badgeRow(game.badges),
     el("span", { class: "game-card__name" }, game.name),
+    game.disliked ? el("span", { class: "game-card__note" }, "내 비선호 태그 포함") : null,  // 검색에서 이름으로 찾아 남은 비선호 게임 (C12-k)
     el("div", { class: "chips" }, (game.tags || []).slice(0, maxTags).map((t) => tagChip(t))),
     showMatch ? matchBadge(game.match, { short: true }) : null);
 }
@@ -371,18 +372,23 @@ export function rankList(ranking, { kind = "likes", empty = null } = {}) {
   if (!ranking.length) {
     return emptyState(empty || (kind === "store" ? "스토어 순위를 아직 받지 못했어요" : "아직 추천을 받은 게임이 없어요"));
   }
-  return el("ol", { class: "rank-list" }, ranking.map((g) => {
+  // 차트 밖 게임(rank null, C12-k)은 순위 숫자 대신 "—", 처음 나오는 곳 위에 "차트 밖" 구분 줄
+  const firstOffChart = ranking.findIndex((g) => g.rank === null || g.rank === undefined);
+  return el("ol", { class: "rank-list" }, ranking.flatMap((g, i) => {
     const sub = g.summary || [...new Set([g.genre, ...(g.tags || []).slice(0, 2)])].filter(Boolean).join(" · ");
     const side = kind === "store" ? storeRanks(g)
       : el("span", { class: "rank-item__side", "aria-label": `추천 ${g.like_count}` }, lineIcon("thumb"), el("span", {}, `${g.like_count}`));
-    return el("li", {},
-      el("a", { class: `rank-item${g.rank <= 3 ? " rank-item--top" : ""}`, href: pages.game(g.id) },
-        el("span", { class: "rank-item__no" }, `${g.rank}`),
+    const ranked = typeof g.rank === "number";
+    const divider = kind === "store" && i === firstOffChart && i > 0
+      ? el("li", { class: "rank-divider", "aria-hidden": "true" }, "차트 밖 — 설치 수·별점 수 순") : null;
+    return [divider, el("li", {},
+      el("a", { class: `rank-item${ranked && g.rank <= 3 ? " rank-item--top" : ""}`, href: pages.game(g.id) },
+        el("span", { class: "rank-item__no", "aria-label": ranked ? `${g.rank}위` : "차트 밖" }, ranked ? `${g.rank}` : "—"),
         el("span", { class: "rank-item__thumb" }, thumbnail(g)),
         el("span", { class: "rank-item__text" },
           el("span", { class: "rank-item__name" }, g.name),
           sub ? el("span", { class: "rank-item__sub" }, sub) : null),
-        side));
+        side))].filter(Boolean);
   }));
 }
 
