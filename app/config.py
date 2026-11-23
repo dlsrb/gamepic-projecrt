@@ -29,6 +29,9 @@ ICON_FETCH = (os.getenv("ICON_FETCH") or "true").lower() == "true"
 PROXY_HOPS = max(0, int(os.getenv("PROXY_HOPS") or 0))
 # 쿠키 없는 요청으로 새 사용자를 만들 수 있는 횟수 (IP당 1시간)
 USER_CREATE_PER_HOUR = max(1, int(os.getenv("USER_CREATE_PER_HOUR") or 60))
+# 요청 횟수 제한(반응·검색·댓글·사용자 생성 등) 끄기: RATE_LIMITS=off. 가상 사용자 시뮬레이션(scripts/simulate_users.py) 전용 —
+# 한 프로세스에서 수백 명이 같은 주소로 요청하므로. 배포·평소에는 쓰지 않음 (기본 on)
+RATE_LIMITS_ON = (os.getenv("RATE_LIMITS") or "on").lower() != "off"
 # 쓰기 요청(POST·PUT·PATCH·DELETE)의 Origin 헤더로 허용하는 주소 (쉼표 구분). 비우면 로컬 주소만
 ALLOWED_ORIGINS = frozenset(
     o.strip().rstrip("/") for o in (os.getenv("ALLOWED_ORIGINS") or "").split(",") if o.strip()

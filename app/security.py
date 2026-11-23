@@ -105,7 +105,9 @@ class RateLimiter:
         self._hits: dict[str, deque] = defaultdict(deque)
 
     def hit(self, key: str, limit: int, now: float, window: float = RATE_WINDOW_SECONDS) -> bool:
-        """이번 요청이 허용되면 True. window = 몇 초 동안 limit번까지"""
+        """이번 요청이 허용되면 True. window = 몇 초 동안 limit번까지. RATE_LIMITS=off(시뮬 전용)면 늘 True"""
+        if not config.RATE_LIMITS_ON:
+            return True
         hits = self._hits[key]
         while hits and hits[0] <= now - window:
             hits.popleft()
