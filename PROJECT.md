@@ -290,6 +290,7 @@ gamepick/
 | C12-i | 맞춤 추천 후보 부족 해결: 검수 먼저 + 9개 미만이면 미검수로 채움(홈 슬라이드도), 검수 도구 `--top`·안내 줄·`docs/tag_list.md` | 11/23 채팅, **지시 본문: `docs/C12-i_지시.md`** | ✅ 완료 (11/23, 로컬), 테스트 241개 통과 — 대체 동작 6명 → 1명, 지시 외 결정 6건 (아래 "결과 (C12-i)"). 검수 50개는 C12-j에서 AI 초안 42개 승인 |
 | C12-j | 태그 정확도: AI 초안 42개 반영 + 출처 기록(`games.tag_source`) → 스토어 분류로 보강 **조사** | 11/23 채팅, **지시 본문: `docs/C12-j_지시.md`** | ✅ 완료 (11/23, 로컬) — 1번 AI 초안 42개 + 출처 기록, 2번 조사 → 결정 → 구현 (Play 태그 칩, store 54개, 태그 113개 더함, checked 아님). 테스트 255개 통과, 출처 human 37 · ai 42 · store 54 · auto 147 (아래 "결과 (C12-j)") |
 | C12-k | 배포 확인에서 나온 3가지: PC Play 링크 점검(`check_store_links.py`) / 검색 이름 부분 일치는 비선호여도 남김 / 랭킹 장르·스토어 탭 차트 밖 게임으로 20개까지 | 11/23 채팅, **지시 본문: `docs/C12-k_지시.md`** | ✅ 완료 (11/23, 로컬), 테스트 267개 통과 — 소울 나이트 Play 링크는 정상(로컬 재현 안 됨, 다음 배포 때 PC에서 href 확인 부탁), 죽은 링크 App Store 1개 비움, 지시 외 결정 7건 (아래 "결과 (C12-k)") |
+| C13 | 게임픽 MCP 서버 (가점): 읽기 전용 도구 4개(검색·상세·추천·랭킹), stdio, Claude 데스크톱 연결 | 11/23 채팅, **지시 본문: `docs/C13_MCP_지시.md`** | ✅ 구현 완료 (11/23, 로컬), 테스트 281개 통과, MCP 연결(smoke_test)·공식 Inspector CLI 확인 — **Claude 데스크톱 연결·시연은 본인**, 지시 외 결정 10건 (아래 "결과 (C13)") |
 
 **C1. 프로젝트 뼈대**
 - 4.7 폴더 구조를 이 폴더 바로 아래에 만든다
@@ -1444,6 +1445,73 @@ Replit 문서는 "Deployments"가 "Publishing"으로 이름이 바뀌어 예전 
 6. 랭킹 API에 `fill` 옵션(기본 true), 홈은 `fill=false`로 차트 순위 게임만
 7. 차트 밖 구분 줄 문구 "차트 밖 — 설치 수·별점 수 순" (순서 기준을 같이 보여 줌)
 
+#### 결과 (C13, 11/23) — 게임픽 MCP 서버 (가점), 지시: `docs/C13_MCP_지시.md`
+
+> 배포 사이트·Replit은 안 건드림. 본인 PC의 Claude 데스크톱에 붙여 시연. AI는 게임픽 DB 도구 결과만 근거, 추천 결정은 기존 엔진 (4.1)
+
+##### 먼저 조사 (11/23, 공식 문서)
+| 항목 | 확인한 내용 (출처) |
+|---|---|
+| SDK | PyPI `mcp` 최신 **2.3.0** (2026-10-02), Python ≥ 3.10 (pypi.org/project/mcp). 1.x(1.30.0)와 2.x가 같이 있음 |
+| 서버 쓰는 법 | 공식 서버 만들기 문서(modelcontextprotocol.io/docs/develop/build-server, 2026-07-28판)는 **SDK 2.0 이상**, `from mcp.server import MCPServer` → `mcp = MCPServer("이름")`, `@mcp.tool()` + 타입 힌트·docstring, `mcp.run(transport="stdio")`. **지시의 FastMCP는 지금 문서·README에 없음** → 문서대로 `MCPServer` 씀 (결정 1) |
+| stdio 주의 | "Never write to stdout" — `print()` 금지, 로그는 stderr (`logging`) |
+| Claude 데스크톱 | `claude_desktop_config.json` — Windows `%AppData%\Claude\`, macOS `~/Library/Application Support/Claude/`. `{"mcpServers": {"이름": {"command": ..., "args": [...]}}}`, 절대 경로, 저장 뒤 앱 다시 시작 |
+| 점검 도구 | MCP Inspector(`npx @modelcontextprotocol/inspector`), CLI 모드 `--cli … --method tools/list` · `--method tools/call --tool-name … --tool-arg k=v` (modelcontextprotocol.io/docs/tools/inspector). 문서상 Node 22.23.4+ / 24.22.1+ 필요 |
+
+##### 만든 것
+- `mcp_server/` (새 폴더)
+  - `gamepick_mcp.py`: MCP 서버 (stdio, `MCPServer("gamepick")`). 도구 4개, 모두 `read_only_hint` 표시. 서버 안내문(instructions)에 "도구 결과만 근거로, 지어내지 말 것, 추천 순서는 엔진 것, auto·store 태그는 확인 전" 
+  - `tools.py`: 도구의 실제 계산 (보통 함수 — 테스트가 바로 부름)
+  - `smoke_test.py`: SDK 클라이언트로 서버를 띄워 도구 목록·호출 확인 (Claude 데스크톱 없이)
+  - `README.md`: 설치·연결 확인·Claude 데스크톱 설정(이 PC 경로)·시연 질문 5개와 기대 결과
+- `requirements-mcp.txt` (새 파일): `mcp==2.3.0`. 기존 `requirements.txt`는 그대로 → Replit 배포·보안 검사 영향 없음. 이 PC 환경에 설치함 (기존 패키지 버전은 안 바뀌고 새 패키지만 추가된 것 확인)
+- `pack_for_replit.py`: zip에서 `mcp_server/`·`requirements-mcp.txt` 뺌
+- `app/routers/search.py`: 검색 해석·거르기·정렬을 `search_catalog()`로 떼어 냄 (`/api/search`와 MCP가 같이 씀, API 동작 그대로 — 기존 검색 테스트 통과)
+- DB: `data/gamepick.db`를 `mode=ro` + `PRAGMA query_only`로 엶 → 쓰기 시도는 "attempt to write a readonly database". MCP 검색은 `search_logs`에도 안 남김
+
+##### 도구 4개
+| 도구 | 재사용 | 결과 |
+|---|---|---|
+| `search_games(query, limit)` | `search_catalog` (태그·동의어·배지·이름 부분 일치, C12-k 순서) — 사용자가 없어 비선호 거르기 없음 | 해석 결과(`interpreted_as`), 총 개수, 게임 |
+| `get_game(game_id)` | `Catalog`, `similar_games` | 설명·태그·배지·별점·설치 수·출시일·차트 순위·링크·비슷한 게임 5개. 없는 id면 이름·id 부분 일치 후보(`maybe`) |
+| `recommend_games(likes, dislikes, favorite_game_ids, limit)` | 설문 3·4·5번과 같은 엔진 입력(`survey_map.tag_options`) → `build_profile` → `expand_dislikes`(연관 태그) → `recommendation_pool`(C12-i) → `recommend` | 취향 요약(장르 필터·연관 태그까지 넓힌 제외 목록), 게임별 `match`·`reasons`. 검수된 게임 먼저 |
+| `get_rankings(kind, tab, limit)` | `rankings.popular(fill=True)` · `services.ranking` · `rankings.monthly` · 급상승 점수 | 인기 랭킹 탭(라벨 "Google Play"·키 "play" 둘 다), 추천 순위(추천 수만), 이달의 게임, 급상승(지금은 "기록 쌓는 중") |
+
+- 모든 게임 결과: `id`·이름·장르·종류별 태그·**`tag_source`**·`tags_checked`·배지·스토어 링크
+- 잘못된 입력은 `{"error": 안내, ...}` (없는 태그 → 쓸 수 있는 태그 목록, 없는 id → 후보, 없는 탭·kind → 목록)
+- 개인 데이터 없음: 사용자·닉네임·댓글·반응 기록은 결과에 안 들어감 (테스트로 확인 — 닉네임·댓글 본문·사용자 id를 넣고 모든 도구 결과에서 찾아봄)
+
+##### 확인
+- **MCP 연결**: `python mcp_server/smoke_test.py` → 도구 4개 목록 + 4개 호출 성공 "OK" (stdio로 실제 서버 프로세스 띄움)
+- **MCP Inspector (공식 점검 도구, v2.13.0)**: `npx -y @modelcontextprotocol/inspector --cli python mcp_server/gamepick_mcp.py --method tools/list` → 도구 4개·입력 스키마·`readOnlyHint: true` / `--method tools/call --tool-name search_games --tool-arg "query=인디 신작"` → 배지 2개로 해석, 30개 중 3개 (`isError: false`). 이 PC Node는 v24.21.0으로 문서의 권장(24.22.1+)보다 조금 낮지만 CLI는 동작함
+- **Claude 데스크톱 연결은 본인 PC에서** (설정 파일은 건드리지 않음, README에 이 PC 경로로 예시) — 연결 뒤 시연 질문 5개로 확인 부탁
+- 시연 질문 5개를 도구로 직접 돌린 결과를 README에 적음 (예: "힐링 퍼즐 광고 싫어" → 캔디크러시 사가·로얄 매치·모뉴먼트 밸리 …, "인디" → 87개)
+- 테스트 **281개 통과** (새 14개 `tests/test_c13.py`: 읽기 전용(쓰기 실패·없는 파일) / 검색 결과 필드·배지 해석·빈 검색어 / 검색 기록 안 남김 / 상세·비슷한 게임 5개 / 없는 id 후보 / 추천 비선호+연관 제외·장르 필터 / 검수 먼저·모자라면 채움 / 좋아하는 게임 기반 / 없는 태그·id 안내 / 랭킹 4종·없는 탭·급상승 기록 쌓는 중 / 추천 순위는 수만·개인 데이터 없음 / 숨긴 게임 안 나옴 / 서버 도구 4개·읽기 전용 표시 / zip에서 빠짐). 기존 테스트 고친 것 없음
+- zip 다시 만듦: 118개 파일, `mcp_server/`·`requirements-mcp.txt`·docs 없음, 이름 모두 ASCII (DB는 안 바뀌어 seed 그대로)
+- 사용자 데이터 그대로 (사용자 4 · 반응 35 · 댓글 4 · 검색 기록 2), 확인용 사용자 안 생김
+- **`git status`**: 새 파일 `mcp_server/`(`__init__.py` · `gamepick_mcp.py` · `tools.py` · `smoke_test.py` · `README.md`) · `requirements-mcp.txt` · `tests/test_c13.py` / 바뀐 파일 `app/routers/search.py` · `scripts/pack_for_replit.py` · `PROJECT.md`
+- **커밋 메시지 제안**:
+  ```
+  C13: 게임픽 MCP 서버 (읽기 전용 도구 4개)
+
+  - mcp_server/: MCPServer(stdio) + 도구 search_games·get_game·recommend_games·get_rankings
+  - 추천은 기존 엔진, 비선호 연관 제외·검수 게임 먼저, DB 읽기 전용, 개인 데이터 없음
+  - requirements-mcp.txt(mcp 2.3.0) 따로, 배포 zip에서 제외
+  - 검색 로직 search_catalog()로 떼어 API와 같이 씀
+  ```
+
+##### 지시서에 없던 결정 (C13)
+1. **FastMCP 대신 `MCPServer`** — 지금 SDK 2.x 공식 문서·README가 `from mcp.server import MCPServer`를 씀 (지시와 다르면 문서를 따르라는 지시대로)
+2. 도구 계산은 `tools.py`의 보통 함수로 두고 서버는 얇게 (MCP 없이 테스트 가능하게). 요청마다 읽기 전용 연결을 열고 닫음
+3. 추천 도구는 무작위 탐색 칸 없이(`explore_ratio=0`) — 같은 질문에 같은 답, 설명 가능하게. 검수 먼저 정렬은 후보 전체에 한 뒤 개수로 자름 (짧게 자른 뒤 정렬하면 태그 1개짜리 미검수 게임이 앞에 남았음)
+4. 추천의 좋아하는 태그는 설문 3번과 같은 규칙: 장르를 고르면 그 장르만 후보, 세부 장르를 고르면 그 게임들의 장르도 (화면 추천과 같게)
+5. 검색 도구는 사용자 취향이 없으니 비선호 거르기·취향 % 없음. 이달의 게임도 사용자 없이
+6. 서버 안내문(instructions)에 "도구 결과만 근거·지어내지 않기·auto/store 태그는 확인 전"을 넣음 (AI 답변 원칙을 서버가 알려 줌)
+7. `smoke_test.py`(SDK 클라이언트로 연결 확인)를 더 만듦 — Claude 데스크톱·Node 없이 확인하려고
+8. stderr를 UTF-8로 (Windows 콘솔에서 한글 로그가 깨져서). stdout은 안 건드림
+9. 이 PC의 Python 환경에 `mcp`를 설치함 (새 패키지만, 기존 버전 변화 없음 — 설치 전에 dry-run으로 확인)
+10. `tests/test_c13.py`는 zip에 들어가지만 배포 서버에선 테스트를 돌리지 않아 영향 없음 (mcp 패키지가 없으면 서버 등록 테스트만 건너뛰게 함)
+
 ##### 확인 · 묶기
 - 확인용 사용자 안 생김 (사용자 4 · 반응 35 · 댓글 4 · 검색 기록 2 그대로), 브라우저 확인 안 함 (화면 안 바뀜)
 - `make_seed_db.py`(게임 291, 출처 human 37 · ai 42 · auto 201, 사용자 0) → `pack_for_replit.py`(112개 파일, 1.5 MB, docs 없음, 이름 모두 ASCII)
@@ -1554,7 +1622,8 @@ Replit 문서는 "Deployments"가 "Publishing"으로 이름이 바뀌어 예전 
 - [ ] **핵심 가치 ② (별점에 묻힌 불만 보여주기)를 웹에서 어떻게 할지** → C7-b 사용자 리뷰 체크 항목 집계로 제안 — 리뷰 분석이 데이터 분석 프로젝트로 분리됨 (상세 페이지 맨 아래 영역)
 - [x] ~~`data/game_list.csv`(게임 100개, Android ID 완료) 처리~~ → **일단 보류(그대로 둠), 문제되면 삭제** (11/2). 게임픽 웹 DB는 당분간 예시 36개 기준. 데이터 분석 프로젝트에서 재사용 가능
 - [x] ~~Replit 배포 시 DB 영속화 방식 (SQLite 유지 vs Replit DB)~~ → **SQLite + Object Storage 백업·복원** (11/16, C10). 다시 배포 후 데이터 유지는 C10 3단계에서 확인
-- [ ] MCP 에이전트 기능 범위 (가점) — 수업 MCP 실습 이후
+- [x] ~~MCP 에이전트 기능 범위 (가점)~~ → C13: 읽기 전용 도구 4개 (검색·상세·추천·랭킹), 11/23 구현
+- [ ] (C13) **Claude 데스크톱에 연결해 시연 확인** (`mcp_server/README.md`의 설정 예시·시연 질문 5개) + 지시서에 없던 결정 10건 검토
 - [x] ~~기술 구성(4.3) 확정 — React 사용 여부~~ → React 미사용
 - [x] ~~게임픽 DB에 넣을 장르 범위~~ → **넓게** (10개 장르, 11/2). `data/game_list.csv` 100개
 - [x] ~~App Store 실제 수집 가능량~~ → 분리로 해당 없음

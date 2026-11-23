@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.config import BASE_DIR
 from app.db import get_db
 from app.deps import get_user
-from app.reco.recommender import FEATURE_FIELDS, game_features, label_of
+from app.reco.recommender import FEATURE_FIELDS, game_features, label_of, match_percent
 from app.security import rate_limit
 from app.services import Catalog, card, profile_for, tag_names
 
@@ -98,6 +98,33 @@ def _name_rank(name: str, whole: str, needles: list[str]) -> int | None:
     return None
 
 
+def search_catalog(catalog: Catalog, profile, words: list[str], selected: list[str]) -> tuple[list[dict], list[dict]]:
+    """
+    검색 해석·거르기·정렬 (/api/search와 MCP search_games가 같이 씀, C13에서 라우터에서 떼어 냄 — 동작은 그대로).
+    반환 (terms, [{game, exact, disliked, match}]) 정렬된 순서. disliked = 비선호인데 이름 일치로 남은 게임
+    """
+    all_tags = {t for g in catalog.games for t in tag_names(g)}
+    terms = interpret(words, all_tags) + interpret(selected, all_tags)
+    exact = _normalize(" ".join(words))
+    searched = {n for t in terms if t["kind"] == "tag" for n in t["include"]}
+    searched |= {label_of(f) for t in terms if t["kind"] == "synonym" for f in t["include"]}
+    excluded = {f for f in profile.excluded if label_of(f) not in searched}
+    needles = [n for n in (_normalize(t["word"]) for t in terms if t["kind"] == "text") if n]
+    hits = []
+    for game in catalog.games:
+        if not _matches(game, terms, catalog.badges):
+            continue
+        name_rank = _name_rank(_normalize(game["name"]), exact, needles)
+        disliked = bool(set(game_features(game)) & profile.excluded)
+        if name_rank is None and set(game_features(game)) & excluded:
+            continue  # 태그·동의어·배지로만 찾은 비선호 게임은 뺌
+        hits.append({"game": game, "rank": name_rank if name_rank is not None else NAME_NONE,
+                     "exact": name_rank == NAME_EXACT, "disliked": disliked and name_rank is not None,
+                     "match": match_percent(game, profile)})
+    hits.sort(key=lambda h: (h["rank"], -h["match"]))
+    return terms, hits
+
+
 @router.get("/search", dependencies=[Depends(rate_limit("search"))])
 def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_length=TAGS_PARAM_MAX),
            user=Depends(get_user), conn: sqlite3.Connection = Depends(get_db)):
@@ -120,27 +147,9 @@ def search(q: str = Query("", max_length=QUERY_MAX), tags: str = Query("", max_l
 
     catalog = Catalog(conn)
     profile = profile_for(conn, user, catalog)
-    all_tags = {t for g in catalog.games for t in tag_names(g)}
-    terms = interpret(words, all_tags) + interpret(selected, all_tags)
-    exact = _normalize(q)
-    searched = {n for t in terms if t["kind"] == "tag" for n in t["include"]}
-    searched |= {label_of(f) for t in terms if t["kind"] == "synonym" for f in t["include"]}
-    excluded = {f for f in profile.excluded if label_of(f) not in searched}
-    needles = [n for n in (_normalize(t["word"]) for t in terms if t["kind"] == "text") if n]
-    found = []
-    for game in catalog.games:
-        if not _matches(game, terms, catalog.badges):
-            continue
-        name = _normalize(game["name"])
-        name_rank = _name_rank(name, exact, needles)
-        disliked = bool(set(game_features(game)) & profile.excluded)
-        if name_rank is None and set(game_features(game)) & excluded:
-            continue  # 태그·동의어·배지로만 찾은 비선호 게임은 뺌
-        extra = {"disliked": True} if disliked and name_rank is not None else {}
-        found.append((name_rank if name_rank is not None else NAME_NONE,
-                      card(catalog, game, profile, exact=name_rank == NAME_EXACT, **extra)))
-    found.sort(key=lambda x: (x[0], -x[1]["match"]))
-    found = [c for _, c in found]
+    terms, hits = search_catalog(catalog, profile, words, selected)
+    found = [card(catalog, h["game"], profile, exact=h["exact"], **({"disliked": True} if h["disliked"] else {}))
+             for h in hits]
 
     if q:
         conn.execute("INSERT INTO search_logs (keyword) VALUES (?)", (q,))

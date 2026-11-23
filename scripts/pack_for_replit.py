@@ -4,6 +4,7 @@ Replit에 올릴 파일 묶기 (PROJECT.md 4.11 C10, docs/C10_배포_지시.md 1
 dist/gamepick_replit.zip 을 만든다.
 - 뺌: .gitignore에 걸린 것(.env, DB, 아이콘, 로그, .idea, __pycache__ …) + legacy/, dist/, .git/, .claude/, docs/
   (docs/는 실행에 필요 없고, 한글 파일 이름 때문에 Replit에서 zip을 풀 때 invalid UTF-8로 배포가 실패했음 — C11-a)
+  mcp_server/·requirements-mcp.txt도 뺌 (MCP 서버는 본인 PC에서만, C13)
 - zip 안 파일 이름은 ASCII만. 아니면 묶기 전에 NonAsciiName 오류로 멈춤
 - 넣음: data/seed.db (.gitignore의 data/*.db에 걸리지만 첫 배포의 시작용 DB라 예외)
 - .env 같은 비밀값 파일은 어떤 경우에도 넣지 않음
@@ -19,7 +20,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 OUT = BASE_DIR / "dist" / "gamepick_replit.zip"
-ALWAYS_SKIP = ["legacy/", "dist/", ".git/", ".claude/", "docs/"]
+ALWAYS_SKIP = ["legacy/", "dist/", ".git/", ".claude/", "docs/",
+               "mcp_server/", "requirements-mcp.txt"]  # MCP 서버는 본인 PC에서만 (C13), 배포에 안 올림
 FORCE_INCLUDE = {"data/seed.db"}
 NEVER_INCLUDE = {".env"}  # 비밀값 (.gitignore에서 빠져도 넣지 않음)
 
