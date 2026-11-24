@@ -29,6 +29,12 @@
       python scripts/sync_store.py --recheck-pending [--dry-run]  검수 대기 다시 판정 (C8-a)
       python scripts/sync_store.py --prune-new --min-installs 1000 --min-ratings 10 [--dry-run]
                                                      신작 경로 게임 중 기준 미달을 숨김 (지우지 않음)
+
+규모 확장 실험 (C16, 실험 DB 전용 — 실제 서버의 매일 수집 범위는 그대로):
+      python scripts/sync_store.py --db data/big.db --target 1500 --genre-charts
+      → --db가 없으면 data/gamepick.db를 읽기 전용으로 열어 복사해서 만들고, 그 DB에만 씀. 실제 DB·seed는 --db로 못 줌
+      → 신작(약 30%) 먼저, 나머지는 장르별 인기 차트(무료·매출·유료, 두 스토어)에서 장르를 돌아가며 상위부터 (한 장르 최대 절반)
+      → 같은 게임 판정·검수 대기·태그·Play 태그 칩은 평소 규칙 그대로, 아이콘은 안 받음, 요청 간격 1초 그대로
 """
 import argparse
 import json
@@ -36,7 +42,10 @@ import logging
 import re
 import sys
 import time
+import sqlite3
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
+from itertools import zip_longest
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -74,6 +83,7 @@ NEW_RELEASE_DAYS = 90             # "최근" = 출시 90일 이내 (홈 신작 �
 NEW_RELEASE_MAX_PER_RUN = 100     # 최근 출시작 상한 (차트용 NEW_GAME_LIMIT와 따로)
 NEW_QUERY_RESULTS = 20            # Play 신작 검색어 하나당 살펴볼 결과 수
 IOS_CHART_URL = "https://itunes.apple.com/kr/rss/{feed}/limit={n}/genre=6014/json"
+IOS_GENRE_CHART_URL = "https://itunes.apple.com/kr/rss/{feed}/limit={n}/genre={genre}/json"   # C16 실험 전용
 IOS_LOOKUP_URL = "https://itunes.apple.com/lookup"
 IOS_SEARCH_URL = "https://itunes.apple.com/search"
 IOS_LOOKUP_BATCH = 100
@@ -83,6 +93,23 @@ PLAY_BATCH_URL = ("https://play.google.com/_/PlayStoreUi/data/batchexecute?rpcid
 PLAY_SEARCH_URL = "https://play.google.com/store/search"
 PACKAGE_IN_CHART = re.compile(r'\\"([a-zA-Z][\w]*(?:\.[\w]+)+)\\",7\]')
 PACKAGE_IN_PAGE = re.compile(r"/store/apps/details\?id=([\w.]+)")
+# ---------- 규모 확장 실험 (C16, --db 실험 DB에서만) ----------
+# 우리 장르 → 그 장르의 스토어 분류 차트 [(스토어, App Store 장르 ID 또는 Play 카테고리)]. 분류는 store_genre_map.json과 같은 대응
+GENRE_CHARTS = {
+    "RPG": [("ios", 7014), ("android", "GAME_ROLE_PLAYING")],
+    "액션": [("ios", 7001), ("ios", 7013), ("android", "GAME_ACTION"), ("android", "GAME_RACING")],
+    "어드벤처": [("ios", 7002), ("android", "GAME_ADVENTURE")],
+    "캐주얼": [("ios", 7003), ("ios", 7016), ("android", "GAME_CASUAL"), ("android", "GAME_ARCADE"),
+             ("android", "GAME_SPORTS")],
+    "퍼즐": [("ios", 7012), ("ios", 7004), ("android", "GAME_PUZZLE"), ("android", "GAME_BOARD"), ("android", "GAME_WORD")],
+    "시뮬레이션": [("ios", 7015), ("android", "GAME_SIMULATION")],
+    "전략": [("ios", 7017), ("ios", 7005), ("android", "GAME_STRATEGY"), ("android", "GAME_CARD")],
+}
+GENRE_CHART_KINDS = ("free", "grossing", "paid")
+GENRE_CHART_SIZE = 200             # Play는 200까지, App Store RSS는 100까지만 옴
+GENRE_SHARE_MAX = 0.5              # 차트 몫에서 한 장르(차트 묶음)가 넘지 않을 비율
+CHART_SHARE = 0.7                  # 목표 중 차트 몫 (나머지 신작). 신작이 모자라면 남는 몫은 차트가 채움
+
 DEVELOPER_SUFFIXES = re.compile(r"(주식회사|\(주\)|corporation|corp|company|co|ltd|limited|inc|llc|pte|gmbh|games?|"
                                 r"studios?|entertainment|interactive)$")
 
@@ -128,6 +155,14 @@ class StoreClient:
         """[{ios_id, name}] 순위 순"""
         return self._ios_feed(IOS_CHARTS[kind])
 
+    def ios_genre_chart(self, kind: str, genre: int) -> list[dict]:
+        """장르별 차트 [{ios_id, name}] (C16 실험 전용)"""
+        entries = self._get(IOS_GENRE_CHART_URL.format(feed=IOS_CHARTS[kind], n=GENRE_CHART_SIZE, genre=genre)).json()
+        entries = entries["feed"].get("entry", [])
+        if isinstance(entries, dict):
+            entries = [entries]
+        return [{"ios_id": e["id"]["attributes"]["im:id"], "name": e["im:name"]["label"]} for e in entries]
+
     def ios_new(self, kind: str) -> list[dict]:
         """신작 피드 [{ios_id, name}] — 게임이 아닌 앱도 섞여 있음 (lookup 뒤 거름)"""
         return self._ios_feed(IOS_NEW_FEEDS[kind])
@@ -148,11 +183,11 @@ class StoreClient:
         return self._get(IOS_SEARCH_URL, params={"term": term, "country": "kr", "entity": "software",
                                                  "limit": n}).json()["results"]
 
-    def android_chart(self, kind: str) -> list[str]:
-        """패키지 이름 목록, 순위 순"""
+    def android_chart(self, kind: str, category: str = "GAME", size: int = CHART_SIZE) -> list[str]:
+        """패키지 이름 목록, 순위 순. category·size는 C16 실험(장르별 차트)에서만 바꿈"""
         request = json.loads(json.dumps(self.chart_request))
-        request[0][1][0][1][1] = CHART_SIZE                               # [[8, [20, 개수]], ...]
-        request[0][2][1], request[0][2][2] = ANDROID_CHARTS[kind], "GAME"  # [2, 차트, 카테고리]
+        request[0][1][0][1][1] = size                                        # [[8, [20, 개수]], ...]
+        request[0][2][1], request[0][2][2] = ANDROID_CHARTS[kind], category  # [2, 차트, 카테고리]
         body = {"f.req": json.dumps([[["vyAe2", json.dumps(request, separators=(",", ":")), None, "generic"]]])}
         self._wait()
         response = self.session.post(PLAY_BATCH_URL, data=body, timeout=TIMEOUT_SECONDS)
@@ -337,9 +372,11 @@ def is_prerelease(app: dict, today: date) -> bool:
 
 
 class Sync:
-    def __init__(self, conn, client, limit: int, today: date, new_limit: int = NEW_RELEASE_MAX_PER_RUN):
+    def __init__(self, conn, client, limit: int, today: date, new_limit: int = NEW_RELEASE_MAX_PER_RUN,
+                 save_icons: bool = True):
         self.conn, self.client, self.limit, self.today = conn, client, limit, today
         self.new_limit = new_limit
+        self.save_icons = save_icons  # C16 실험은 아이콘을 안 받음
         self.since = (today - timedelta(days=NEW_RELEASE_DAYS)).isoformat()
         self.genre_map = load_json("store_genre_map.json")
         self.keywords = load_json("tag_keywords.json")
@@ -409,7 +446,7 @@ class Sync:
         return (similar[0], "ambiguous") if similar else (None, "")
 
     def save_icon(self, game_id: str, url: str | None) -> str | None:
-        if not url:
+        if not url or not self.save_icons:
             return None
         try:
             content = self.client.image(url)
@@ -698,6 +735,89 @@ class Sync:
         for line in self.report["existing_prerelease"]:
             self.note(f"출시 예정으로 보이는 게임 (지우지 않음): {line}")
 
+    # --- 규모 확장 실험 (C16) ---
+    def visible_count(self) -> int:
+        return self.conn.execute("SELECT COUNT(*) FROM games WHERE review_status = 'ok'").fetchone()[0]
+
+    def genre_queues(self) -> dict[str, list[tuple[str, str]]]:
+        """우리 장르 → [(스토어, ID)] — 그 장르 차트들(무료·매출·유료)을 순위대로 번갈아 섞음, 중복 없이"""
+        queues = {}
+        for genre, charts in GENRE_CHARTS.items():
+            lists = []
+            for store, category in charts:
+                for kind in GENRE_CHART_KINDS:
+                    try:
+                        if store == "ios":
+                            ids = [e["ios_id"] for e in self.client.ios_genre_chart(kind, category)]
+                        else:
+                            ids = self.client.android_chart(kind, category, GENRE_CHART_SIZE)
+                    except Exception as error:  # noqa: BLE001 - 차트 하나 실패해도 계속
+                        self.note(f"장르 차트 실패 {store} {category} {kind}: {error}")
+                        continue
+                    log.info("장르 차트 %s %s %s %d개", genre, category, kind, len(ids))
+                    lists.append([(store, i) for i in ids])
+            merged = []
+            for row in zip_longest(*lists):
+                merged += [item for item in row if item]
+            queues[genre] = list(dict.fromkeys(merged))
+        return queues
+
+    def big_run(self, target: int) -> dict:
+        """목표 개수까지: 신작(약 30%) → 장르별 차트(나머지, 장르 돌아가며). 아이콘 안 받음. 기존 게임 숫자 갱신은 안 함"""
+        started = time.monotonic()
+        ios_best, android_best = self.fetch_charts()           # 홈 인기 순위(chart_rank_*)는 평소처럼
+        need = max(0, target - self.visible_count())
+        new_quota = need - round(need * CHART_SHARE)
+        self.report["big"] = {"target": target, "start_visible": self.visible_count(), "need": need,
+                              "new_quota": new_quota}
+        self.new_limit = new_quota
+        self.add_new_releases()
+        chart_quota = max(0, target - self.visible_count())    # 신작이 모자란 만큼 차트가 채움
+        queues = self.genre_queues()
+        known = self.known_ids()
+        ios_ids = sorted({i for q in queues.values() for s, i in q if s == "ios" and i not in known})
+        try:
+            ios_info = self.client.ios_lookup(ios_ids) if ios_ids else {}
+        except Exception as error:  # noqa: BLE001
+            self.note(f"App Store 장르 차트 조회 실패: {error}")
+            ios_info = {}
+        android_all = {i for q in queues.values() for s, i in q if s == "android"} | set(android_best)
+        added_by_genre = Counter()
+        cap = max(1, int(chart_quota * GENRE_SHARE_MAX))
+        positions = {g: 0 for g in queues}
+        chart_added = 0
+        while chart_added < chart_quota and any(positions[g] < len(queues[g]) for g in queues):
+            for genre in queues:
+                if chart_added >= chart_quota:
+                    break
+                if positions[genre] >= len(queues[genre]) or added_by_genre[genre] >= cap:
+                    positions[genre] = len(queues[genre]) if added_by_genre[genre] >= cap else positions[genre]
+                    continue
+                store, store_id = queues[genre][positions[genre]]
+                positions[genre] += 1
+                if store_id in self.known_ids():
+                    continue
+                try:
+                    result = self.handle_candidate(store, store_id, ios_info, android_all)
+                    self.conn.commit()
+                except Exception as error:  # noqa: BLE001 - 게임 하나 실패해도 계속
+                    self.conn.rollback()
+                    self.report["failed"] += 1
+                    self.note(f"장르 차트 게임 실패 {store} {store_id}: {error}")
+                    continue
+                if result == "added":
+                    added_by_genre[genre] += 1
+                    chart_added += 1
+                    if chart_added % 50 == 0:
+                        log.info("장르 차트 추가 %d / %d (지금 화면 게임 %d개, %.0f분)", chart_added, chart_quota,
+                                 self.visible_count(), (time.monotonic() - started) / 60)
+        self.save_chart_ranks()
+        self.report["big"].update(chart_quota=chart_quota, chart_added_by_queue=dict(added_by_genre),
+                                  queues={g: len(q) for g, q in queues.items()},
+                                  queue_used={g: positions[g] for g in queues},
+                                  end_visible=self.visible_count(), minutes=round((time.monotonic() - started) / 60, 1))
+        return self.report
+
     def run(self):
         ios_best, android_best = self.fetch_charts()
         ios_ids = sorted(set(ios_best) | {r["ios_id"] for r in self.games() if r["ios_id"]})
@@ -715,9 +835,9 @@ class Sync:
 
 
 # ---------- 실행 ----------
-def setup_log(today: date) -> logging.Handler:
+def setup_log(today: date, prefix: str = "sync") -> logging.Handler:
     LOG_DIR.mkdir(exist_ok=True)
-    handler = logging.FileHandler(LOG_DIR / f"sync_{today:%Y%m%d}.log", encoding="utf-8")
+    handler = logging.FileHandler(LOG_DIR / f"{prefix}_{today:%Y%m%d}.log", encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     log.addHandler(handler)
     log.setLevel(logging.INFO)
@@ -730,10 +850,11 @@ def last_success(conn) -> datetime | None:
 
 
 def run_sync(db_path=None, client=None, limit: int = NEW_GAME_LIMIT, today: date | None = None,
-             new_limit: int = NEW_RELEASE_MAX_PER_RUN) -> dict:
-    """수집 1번. 다른 수집이 돌고 있으면 건너뜀. 결과 요약을 돌려준다."""
+             new_limit: int = NEW_RELEASE_MAX_PER_RUN, target: int | None = None) -> dict:
+    """수집 1번. 다른 수집이 돌고 있으면 건너뜀. 결과 요약을 돌려준다.
+    target을 주면 규모 확장 실험(C16): 장르별 차트로 그 개수까지, 아이콘 안 받음 — main()이 실험 DB일 때만 넘김"""
     today = today or date.today()
-    handler = setup_log(today)
+    handler = setup_log(today, "sync_big" if target else "sync")
     try:
         with get_connection(db_path) as conn:
             stale = (datetime.now(timezone.utc) - timedelta(hours=RUNNING_STALE_HOURS)).strftime("%Y-%m-%d %H:%M:%S")
@@ -748,7 +869,8 @@ def run_sync(db_path=None, client=None, limit: int = NEW_GAME_LIMIT, today: date
         report, status = {}, "failed"
         try:
             with get_connection(db_path) as conn:
-                report = Sync(conn, client or StoreClient(), limit, today, new_limit).run()
+                sync = Sync(conn, client or StoreClient(), limit, today, new_limit, save_icons=target is None)
+                report = sync.big_run(target) if target else sync.run()
                 report["snapshot"] = save_daily_snapshot(conn, today)  # 인기 급상승용 하루 기록 (C12-e)
                 conn.commit()
             status = "ok"
@@ -821,6 +943,34 @@ def set_review(ids: list[str], status: str):
             print(f"{game_id}: {'→ ' + status if changed else '자동 수집 게임이 아님 (바꾸지 않음)'}")
 
 
+def big_collect(db: Path, target: int, client=None) -> dict:
+    """규모 확장 실험 (C16). 실제 DB·seed에는 쓰지 않음"""
+    db = db.resolve()
+    if db in {DB_PATH.resolve(), (DATA_DIR / "seed.db").resolve()}:
+        sys.exit(f"실험 DB에 실제 DB를 줄 수 없습니다: {db}")
+    if not db.exists():
+        src = sqlite3.connect(f"{DB_PATH.resolve().as_uri()}?mode=ro", uri=True)  # 원본은 읽기 전용
+        dst = sqlite3.connect(db)
+        try:
+            src.backup(dst)
+        finally:
+            src.close()
+            dst.close()
+        log.info("실험 DB 만듦: %s ← %s", db, DB_PATH)
+    console = logging.StreamHandler()
+    console.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(console)
+    try:
+        report = run_sync(db, client, target=target)
+    finally:
+        log.removeHandler(console)
+    big = report.get("big", {})
+    print(f"\n실험 DB {db}: 화면 게임 {big.get('start_visible')} → {big.get('end_visible')} (목표 {target}), "
+          f"신작 {report.get('new_added', 0)} · 차트 {report.get('added', 0)} · 검수 대기 "
+          f"{report.get('pending', 0) + report.get('new_pending', 0)} · 실패 {report.get('failed', 0)} · {big.get('minutes')}분")
+    return report
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="스토어 자동 수집 (C7-a2, C7-f)")
     parser.add_argument("--limit", type=int, default=NEW_GAME_LIMIT, help="차트 새 게임 최대 개수")
@@ -835,7 +985,15 @@ def main(argv=None):
     parser.add_argument("--recheck-pending", action="store_true",
                         help="검수 대기를 다시 판정 (DB 게임과 이름이 안 비슷하면 화면에 보이게)")
     parser.add_argument("--dry-run", action="store_true", help="--prune-new·--recheck-pending: 보여 주기만 하고 안 바꿈")
+    # 규모 확장 실험 (C16): 기본은 모두 꺼짐 — 실제 서버의 매일 수집(app/store_sync.py)은 이 옵션을 안 씀
+    parser.add_argument("--db", type=Path, help="실험 DB (없으면 data/gamepick.db를 읽기 전용으로 복사해 만듦)")
+    parser.add_argument("--target", type=int, help="--db: 화면에 보이는 게임이 이 개수가 되도록 (예: 1500)")
+    parser.add_argument("--genre-charts", action="store_true", help="--db·--target: 장르별 인기 차트로 모음")
     args = parser.parse_args(argv)
+    if args.db or args.target or args.genre_charts:
+        if not (args.db and args.target and args.genre_charts):
+            sys.exit("규모 실험은 --db, --target, --genre-charts를 함께 줘야 합니다 (실험 DB 전용)")
+        return big_collect(args.db, args.target)
     if not DB_PATH.exists():
         sys.exit("DB가 없습니다. 먼저 python scripts/init_db.py 를 실행하세요.")
     if args.recheck_pending:

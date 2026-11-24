@@ -107,10 +107,21 @@ def parse_args(argv=None):
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="시뮬 DB (덮어씀)")
     parser.add_argument("--metrics", type=Path, default=DEFAULT_METRICS)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
+    parser.add_argument("--db", type=Path,
+                        help="규모 실험(C16): 이미 만든 실험 DB(예: data/big.db)에서 바로 시뮬. 처음엔 <이름>_base.db로 백업해 두고, "
+                             "다시 돌리면(--force) 그 백업에서 시작. 숫자·보고서는 data/<이름>_metrics.json·data/<이름>_sim_report.md")
     parser.add_argument("--no-bench", action="store_true", help="속도 측정 건너뜀 (테스트용)")
     parser.add_argument("--report-only", action="store_true",
                         help="시뮬을 다시 돌리지 않고 --metrics 숫자로 보고서만 다시 씀 (docs/sim_notes.md를 고친 뒤)")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.db:
+        stem = args.db.stem
+        args.out = args.db
+        if args.metrics == DEFAULT_METRICS:
+            args.metrics = args.db.parent / f"{stem}_metrics.json"
+        if args.report == DEFAULT_REPORT:
+            args.report = args.db.parent / f"{stem}_sim_report.md"
+    return args
 
 
 def rerun_with_hash_seed(seed: int) -> None:
@@ -142,6 +153,39 @@ def prepare_db(source: Path, out: Path, force: bool) -> None:
     finally:
         src.close()
         dst.close()
+
+
+def prepare_in_place(db: Path, force: bool) -> None:
+    """--db: 실험 DB에서 바로 시뮬 (C16). 실제 DB·seed는 거절. 시뮬 전 상태를 <이름>_base.db로 한 번 백업"""
+    db = db.resolve()
+    if db in {DEFAULT_SOURCE.resolve(), (BASE_DIR / "data" / "seed.db").resolve()}:
+        raise SystemExit(f"시뮬 DB를 실제 DB에 쓸 수 없습니다: {db}")
+    if not db.exists():
+        raise SystemExit(f"{db}가 없습니다 (먼저 scripts/sync_store.py --db로 만듦)")
+    base = db.with_name(f"{db.stem}_base.db")
+
+    def copy(src_path: Path, dst_path: Path):
+        src = sqlite3.connect(f"{src_path.as_uri()}?mode=ro", uri=True)
+        dst = sqlite3.connect(dst_path)
+        try:
+            src.backup(dst)
+        finally:
+            src.close()
+            dst.close()
+
+    conn = sqlite3.connect(db)
+    simulated = conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'sim_users'").fetchone()
+    conn.close()
+    if simulated:
+        if not force or not base.exists():
+            raise SystemExit(f"{db}에 이미 시뮬 기록이 있습니다. 백업({base.name})에서 다시 하려면 --force")
+        copy(base, db)
+    elif not base.exists():
+        copy(db, base)
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE sim_users (user_id TEXT PRIMARY KEY, kind TEXT NOT NULL, persona TEXT)")
+    conn.commit()
+    conn.close()
 
 
 def boot_app(out: Path):
@@ -326,6 +370,7 @@ class Sim:
         data = user["client"].get("/api/search", params={"q": query}).json()
         ids = [g["id"] for g in data.get("games", [])]
         self.searches.append({"uid": user["uid"], "kind": kind, "query": query, "count": len(ids),
+                              "partial": bool(data.get("partial")),
                               "target": target, "found": target in ids if target else None})
 
     def visit(self, user: dict) -> None:
@@ -407,6 +452,7 @@ class Sim:
     # --- 전체 ---
     def run(self) -> dict:
         args, rng = self.args, self.rng
+        self.started = time.perf_counter()
         questions = self.client().get("/api/survey/questions").json()["questions"]
         # 측정용 사용자(가상) — 설문 RPG·판타지, 처음과 끝에 같은 사람으로 속도·랭킹을 잼
         bench = self.client()
@@ -437,6 +483,8 @@ class Sim:
                     created[i] = self.create_user(i, questions)
                 self.visit(created[i])
             self.shift(since, args.days - day)
+            print(f"[시뮬] {day}/{args.days}일: 오늘 방문 {len(todays)} · 누적 사용자 {len(created)}/{args.users} · "
+                  f"{time.perf_counter() - self.started:.0f}초", file=sys.stderr, flush=True)
         self.users = list(created.values())
         after = {"bench": self.bench(bench, bench_game), **self.snapshot(probe)}
         return self.metrics(before, after, real_users)
@@ -501,6 +549,8 @@ class Sim:
                          "after": {k: after[k] for k in ("likes_top10", "monthly")}},
             "search": {"total": len(self.searches), "by_kind": dict(Counter(s["kind"] for s in self.searches)),
                        "zero_result": zero.most_common(),
+                       "partial": sum(1 for s in self.searches if s.get("partial")),
+                       "zero_count": sum(1 for s in self.searches if s["count"] == 0),
                        "name_success": round(sum(1 for s in name_searches if s["found"]) / len(name_searches), 4)
                        if name_searches else None,
                        "name_failures": sorted({(s["query"], self.names.get(s["target"], s["target"]))
@@ -654,7 +704,10 @@ def main(argv=None):
     rerun_with_hash_seed(args.seed)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    prepare_db(args.source, args.out, args.force)
+    if args.db:
+        prepare_in_place(args.db, args.force)
+    else:
+        prepare_db(args.source, args.out, args.force)
     app = boot_app(args.out)
     rng = random.Random(args.seed)
     random.seed(args.seed)   # 앱 안의 무작위(실험 그룹 배정·탐색 칸)도 같은 시드로
